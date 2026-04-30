@@ -288,6 +288,31 @@ The honest pitch isn't "private," it's: **you own the keys, you pick the provide
 
 See [SECURITY.md](SECURITY.md) for full details on data flow, key storage, and how to nuke everything.
 
+## Trust Model — Read This Before Installing
+
+MavKa runs **Pi Coding Agent** under the hood, and Pi is intentionally a "YOLO" agent — its author says so [openly](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/). It has no built-in permission popups, no per-action confirmations, no allow-lists. When the LLM says "run this shell command", Pi runs it.
+
+**Treat MavKa like SSH access to your user account.** That means:
+
+- It can read any file your user can read.
+- It can write/delete files in your home directory.
+- It can run shell commands as you (no `sudo`, but everything else).
+- It can make outbound network requests.
+
+**What MavKa does to mitigate this:**
+
+- On macOS/Linux, the installer enables Pi's `@anthropic-ai/sandbox-runtime` extension by default. It deny-lists `~/.ssh`, `~/.aws`, `~/.gnupg`, and secret-looking paths (`*.pem`, `*.key`, `.env*`) for shell commands. It uses `sandbox-exec` on macOS, `bubblewrap` on Linux. **It does NOT sandbox the `read`/`write`/`edit` tools** — those still have full FS access through Node.
+- API keys are stored in `~/.pi/agent/auth.json` mode 0600 (only your user can read).
+- You can completely uninstall with `bash <(curl -sL .../uninstall.sh)` — and rotate API keys on each provider's site.
+
+**What MavKa does NOT do:**
+
+- No per-command confirmation prompts (that fights Pi's design).
+- No Docker/VM isolation.
+- No code review of LLM-suggested actions before they execute.
+
+**If that's not your trust level**, don't install MavKa on a machine with credentials you can't afford to lose. Run it in a VM, or wait for a future version with stronger sandboxing. Be honest about who's getting SSH-equivalent access here: you, the LLM you picked, and (in theory) anyone who can compromise that LLM provider.
+
 ## The Real Cost
 
 | Provider | Casual chat | Heavy coding |

@@ -1055,7 +1055,13 @@ for f in "\$HOME/mavka-bot/memory/"*.md; do
   echo "" >> "\$PROMPT_FILE"
 done
 
-exec pi --provider ${PROVIDER_PI_NAME} --model ${PROVIDER_RUN_MODEL} \\
+# Conditionally load Pi's sandbox extension if configured
+SANDBOX_FLAG=""
+if [ -f "\$HOME/.pi/agent/extensions/sandbox.json" ] && [ -d "\$HOME/.pi/agent/extensions/sandbox" ]; then
+  SANDBOX_FLAG="-e sandbox"
+fi
+
+exec pi --provider ${PROVIDER_PI_NAME} --model ${PROVIDER_RUN_MODEL} \$SANDBOX_FLAG \\
    --append-system-prompt "\$PROMPT_FILE"
 STARTEOF
   chmod +x "$MAVKA_HOME/start.sh"
@@ -1254,6 +1260,79 @@ with open('$HOME/.pi/agent/auth.json', 'w') as f:
 "
 
   ok "Pi Agent configured"
+
+  setup_sandbox
+}
+
+# ─── Sandbox extension (mitigates Pi's YOLO mode) ─────────────
+# Pi Agent has no built-in permissions. Its sandbox extension uses
+# sandbox-exec on macOS / bubblewrap on Linux to deny-list secret
+# files and restrict network for the `bash` tool.
+# https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/sandbox
+setup_sandbox() {
+  step "Setting up Pi sandbox extension..."
+
+  SANDBOX_DIR="$HOME/.pi/agent/extensions/sandbox"
+  mkdir -p "$SANDBOX_DIR"
+
+  # Fetch the sandbox extension from pi-mono repo
+  if [ ! -f "$SANDBOX_DIR/index.ts" ]; then
+    info "Fetching sandbox extension from pi-mono..."
+    TMPCLONE=$(mktemp -d)
+    if git clone --depth 1 --filter=blob:none --sparse \
+        https://github.com/badlogic/pi-mono.git "$TMPCLONE" >/dev/null 2>&1; then
+      (cd "$TMPCLONE" && git sparse-checkout set packages/coding-agent/examples/extensions/sandbox >/dev/null 2>&1)
+      if [ -d "$TMPCLONE/packages/coding-agent/examples/extensions/sandbox" ]; then
+        cp -R "$TMPCLONE/packages/coding-agent/examples/extensions/sandbox/." "$SANDBOX_DIR/" 2>/dev/null
+      fi
+      rm -rf "$TMPCLONE"
+    fi
+    # Install npm deps if package.json present
+    if [ -f "$SANDBOX_DIR/package.json" ]; then
+      (cd "$SANDBOX_DIR" && npm install --silent --no-audit --no-fund >/dev/null 2>&1) || \
+        warn "Sandbox npm install failed — sandbox may not load"
+    fi
+  fi
+
+  # Default deny-list config
+  cat > "$HOME/.pi/agent/extensions/sandbox.json" << SANDBOXJSON
+{
+  "enabled": true,
+  "network": {
+    "allowedDomains": ["*"],
+    "deniedDomains": []
+  },
+  "filesystem": {
+    "denyRead":  ["~/.ssh", "~/.aws", "~/.gnupg", "~/mavka-bot/start.sh", "~/.pi/agent/auth.json", "~/.pi/agent/telegram.json"],
+    "allowWrite": [".", "/tmp", "~/mavka-bot"],
+    "denyWrite": [".env", ".env.*", "*.pem", "*.key", "id_rsa", "id_ed25519"]
+  }
+}
+SANDBOXJSON
+
+  # Linux: bubblewrap is required by sandbox-runtime
+  if [ "$OS" = "linux" ]; then
+    if ! command -v bwrap >/dev/null 2>&1; then
+      info "Installing bubblewrap (sandbox runtime)..."
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get install -y bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+      else
+        warn "Could not auto-install bubblewrap. Install manually for sandbox to work."
+      fi
+    fi
+  fi
+
+  if [ "$OS" = "mac" ] || command -v bwrap >/dev/null 2>&1; then
+    ok "Sandbox extension configured (deny-list applied)"
+    SANDBOX_ENABLED=1
+  else
+    warn "Sandbox unavailable on this system — Pi will run with full file/network access"
+    SANDBOX_ENABLED=0
+  fi
 }
 
 # ─── Patch pi-telegram ────────────────────────────────────────

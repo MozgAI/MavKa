@@ -79,9 +79,49 @@ Found something? Email **lytvynca@gmail.com** with subject `[MavKa Security]`.
 
 Please don't open public issues for vulnerabilities — give me 7 days to fix before disclosure.
 
+## Pi Agent's trust model (important)
+
+MavKa is built on [Pi Coding Agent](https://github.com/badlogic/pi-mono). Pi is intentionally a "YOLO" agent — the author has [stated explicitly](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/) that there are no permission popups, no per-action confirmations, no allow-lists in the core. When the LLM says "run this shell command", Pi runs it.
+
+**Treat MavKa like SSH access to your user account.** It can:
+- Read any file your user can read.
+- Write or delete files in your home directory.
+- Run shell commands as you (no sudo, but everything else).
+- Make outbound network requests.
+
+### What MavKa does to mitigate
+
+The installer enables Pi's [sandbox extension](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/sandbox) by default on macOS and Linux. It uses:
+- **macOS:** `sandbox-exec` (built into the OS).
+- **Linux:** `bubblewrap` (auto-installed via apt/pacman/dnf if missing).
+- **Windows:** **no sandbox available** — Windows beta has no equivalent yet.
+
+Default deny-list (in `~/.pi/agent/extensions/sandbox.json`):
+```
+denyRead:  ~/.ssh ~/.aws ~/.gnupg ~/mavka-bot/start.sh
+denyWrite: .env .env.* *.pem *.key
+allowWrite: . /tmp ~/mavka-bot
+```
+
+**Critical limitation:** the sandbox extension only intercepts the `bash` tool. The built-in `read`, `write`, and `edit` tools still have full filesystem access through Node — they're not sandboxed. So Pi can still read your `~/.ssh/id_rsa` via the `read` tool even with sandbox enabled.
+
+### What MavKa does NOT do
+
+- No per-command confirmation prompts (that fights Pi's design).
+- No Docker/VM isolation.
+- No code review of LLM-suggested actions before they execute.
+- No sandbox at all on Windows (beta).
+
+### If you want stronger isolation
+
+- Run MavKa in a dedicated VM (UTM/Parallels/VirtualBox/multipass).
+- Run it under a separate, low-privilege user account.
+- Don't install it on a machine with credentials you can't afford to lose (don't put MavKa next to your production SSH keys).
+- Wait for a future version with stronger sandboxing — issue trackers welcome.
+
 ## What MavKa is NOT
 
-- Not audited. This is a one-person side project.
+- Not audited. One-person side project.
 - Not enterprise-ready. Don't deploy this for your company.
-- Not a sandbox. Pi Agent has computer-use tools — it can read/write files in your home directory and run shell commands. Treat it like ssh access.
-- Not a replacement for production-grade chatbots. Use it for personal use.
+- Not a sandbox in any strong sense — see "Pi Agent's trust model" above.
+- Not a replacement for production-grade chatbots. Use it for personal projects.
