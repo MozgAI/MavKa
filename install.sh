@@ -69,8 +69,9 @@ set_lang() {
       L_get_keys="Отримайте ключі (всі безкоштовні або майже):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (пошук): "
-      L_ds_brain="DeepSeek — мозок твого бота"
-      L_ds_getfree="platform.deepseek.com  ·  поповни на \$2 — вистачить на 2 тижні – 2 місяці"
+      L_ds_brain="DeepSeek — мозок MavKa"
+      L_ds_url="platform.deepseek.com"
+      L_ds_credit="\$2 стартовий кредит — зазвичай вистачає на місяць"
       L_ds_signup="Зареєструйся, поповни рахунок на \$2, створи API Key і встав сюди."
       L_verifying="Перевіряємо ключ..."
       L_ds_works="DeepSeek API ключ працює!"
@@ -79,7 +80,11 @@ set_lang() {
       L_ai_natural="Пиши природно — задавай питання, якщо щось незрозуміло."
       L_ai_skip="Пиши 'пропустити' для необов'язкових кроків."
       L_optional="(необов'язково — пропустіть для відключення)"; L_required="обов'язкове поле"
-      L_create_bot="Створіть бота: t.me/BotFather → /newbot"
+      L_create_bot="Створіть бота:"
+      L_botfather_url="t.me/BotFather"
+      L_botfather_cmd="/newbot"
+      L_userid_get="Отримай свій ID:"
+      L_userid_url="t.me/userinfobot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
       L_bot_name="Ім'я бота [MavKa]: "
       L_choose_persona="Оберіть особистість або опишіть свою:"
@@ -97,8 +102,9 @@ set_lang() {
       L_get_keys="Получите ключи (все бесплатные или почти):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (поиск): "
-      L_ds_brain="DeepSeek — мозг твоего бота"
-      L_ds_getfree="platform.deepseek.com  ·  пополни на \$2 — хватит на 2 недели – 2 месяца"
+      L_ds_brain="DeepSeek — мозг MavKa"
+      L_ds_url="platform.deepseek.com"
+      L_ds_credit="\$2 стартового кредита — обычно хватает до месяца"
       L_ds_signup="Зарегистрируйся, пополни счёт на \$2, создай API Key и вставь сюда."
       L_verifying="Проверяем ключ..."
       L_ds_works="DeepSeek API ключ работает!"
@@ -107,7 +113,11 @@ set_lang() {
       L_ai_natural="Пиши естественно — задавай вопросы, если что-то неясно."
       L_ai_skip="Пиши 'пропустить' для необязательных шагов."
       L_optional="(необязательно — пропустите для отключения)"; L_required="обязательное поле"
-      L_create_bot="Создайте бота: t.me/BotFather → /newbot"
+      L_create_bot="Создайте бота:"
+      L_botfather_url="t.me/BotFather"
+      L_botfather_cmd="/newbot"
+      L_userid_get="Получи свой ID:"
+      L_userid_url="t.me/userinfobot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
       L_bot_name="Имя бота [MavKa]: "
       L_choose_persona="Выберите личность или опишите свою:"
@@ -125,8 +135,9 @@ set_lang() {
       L_get_keys="Get your keys (all free or nearly free):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (voice): "
       L_gemini_key="Gemini API Key (photos): "; L_tavily_key="Tavily API Key (web search): "
-      L_ds_brain="DeepSeek — the brain of your bot"
-      L_ds_getfree="platform.deepseek.com  ·  top up \$2 — lasts 2 weeks to 2 months"
+      L_ds_brain="DeepSeek — MavKa's brain"
+      L_ds_url="platform.deepseek.com"
+      L_ds_credit="\$2 starter credit — usually enough for up to 1 month"
       L_ds_signup="Sign up, top up \$2, create an API key, and paste it here."
       L_verifying="Verifying API key..."
       L_ds_works="DeepSeek API key works!"
@@ -135,7 +146,11 @@ set_lang() {
       L_ai_natural="Type naturally — ask questions if anything is unclear."
       L_ai_skip="Type 'skip' to skip optional steps."
       L_optional="(optional — skip to disable)"; L_required="required"
-      L_create_bot="Create a bot: t.me/BotFather → /newbot"
+      L_create_bot="Create a bot:"
+      L_botfather_url="t.me/BotFather"
+      L_botfather_cmd="/newbot"
+      L_userid_get="Get your ID:"
+      L_userid_url="t.me/userinfobot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Your Telegram User ID: "
       L_bot_name="Bot name [MavKa]: "
       L_choose_persona="Choose a personality or write your own:"
@@ -176,7 +191,8 @@ collect_info() {
   echo ""
   echo -e "${GREEN}${BOLD}  $L_step2${NC}"
   echo -e "  ${DIM}$L_ds_brain${NC}"
-  echo -e "  ${DIM}  $L_ds_getfree${NC}"
+  echo -e "  ${PURPLE}$L_ds_url${NC}"
+  echo -e "  ${DIM}$L_ds_credit${NC}"
   echo ""
 
   while true; do
@@ -560,7 +576,7 @@ AIEOF
     while true; do
       read -p "  Telegram Bot Token: " TG_TOKEN
       [ -n "$TG_TOKEN" ] && break
-      echo -e "  ${DIM}  Create one: t.me/BotFather → /newbot${NC}"
+      echo -e "  ${DIM}  $L_create_bot ${NC}${PURPLE}$L_botfather_url${NC} ${DIM}→ $L_botfather_cmd${NC}"
     done
   fi
 
@@ -569,7 +585,7 @@ AIEOF
     while true; do
       read -p "  Your Telegram User ID: " TG_USER_ID
       [ -n "$TG_USER_ID" ] && break
-      echo -e "  ${DIM}  Get it: t.me/userinfobot${NC}"
+      echo -e "  ${DIM}  $L_userid_get ${NC}${PURPLE}$L_userid_url${NC}"
     done
   fi
 }
@@ -587,7 +603,7 @@ manual_collect_remaining() {
 
   echo ""
   echo -e "${GREEN}${BOLD}  $L_step3${NC}"
-  echo -e "  ${DIM}$L_create_bot${NC}"
+  echo -e "  ${DIM}$L_create_bot${NC} ${PURPLE}$L_botfather_url${NC} ${DIM}→ $L_botfather_cmd${NC}"
   echo ""
 
   while true; do
