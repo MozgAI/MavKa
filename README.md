@@ -97,9 +97,53 @@ Most AI tools force a choice: a **chat app** on your phone, or a **coding agent*
 Voice notes, photo analysis, web search, persistent memory. No app to install. Open Telegram, talk to your AI. Same chat works on your phone, tablet, watch, anywhere Telegram runs.
 
 ### 💻 On your PC — coding agent like Claude Code
-Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask the bot in Telegram to refactor a file on your laptop — it just does it.
+Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask MavKa in Telegram to refactor a file on your laptop — it just does it.
 
 **One install. Two superpowers. ~$2/month.**
+
+## Who Is MavKa For?
+
+MavKa isn't just for developers. It's a **personal AI agent with a brain, internet access, and your memory** — useful for almost everyone who has a phone.
+
+### 👨‍💻 Developers & vibecoders
+Voice-driven coding, repo refactors, debugging, commits, deployments — all from Telegram, all running on your laptop. See [Vibecoding the Easy Way](#vibecoding-the-easy-way) below.
+
+### 🎓 Students & learners
+Explain a calculus problem with a photo of the page. Summarize a 60-page PDF. Practice a foreign language out loud (voice in, voice out). Get tutored on any topic — MavKa remembers what you already know.
+
+### 🏠 At home — recipes, lifehacks, household
+*"What can I cook with these?"* — send a photo of your fridge.
+*"Best way to remove red wine from white shirt?"* — voice question while doing laundry.
+*"Make me a 7-day meal plan, $80 budget, two people"* — done.
+*"Read this label, is it gluten-free?"* — photo of the package.
+
+### 🥗 Diet, fitness, calories
+Send a photo of your plate — MavKa estimates calories and macros. Discuss meal plans, training programs, swap exercises. Track progress in persistent memory across weeks.
+
+### 💪 At the gym
+*"I'm at the gym, all dumbbells busy. Build me a chest workout with just barbells."*
+*"How do I do a Romanian deadlift correctly?"* — get a step-by-step.
+Send a video of your form (well, a photo for now), get notes.
+
+### 💄 Beauty, skincare, style
+*"Read these ingredients — anything I should avoid for sensitive skin?"*
+*"Outfit advice for a job interview, budget $200"* — describe what you have, MavKa picks combinations.
+
+### 📊 Personal finance & bookkeeping
+Photograph receipts → MavKa categorizes them. Build a personal budget. Walk through tax basics. Ask about a contract clause before you sign.
+
+### 🩺 Health curiosity (not medical advice)
+*"What does this rash look like?"* — photo + symptoms → general info + advice to see a doctor.
+*"My BP reads 140/90 — should I be worried?"* — context, what to track.
+**MavKa is not a doctor. For anything serious, see a real one.** It's a smart sidekick for tracking and curiosity, not a replacement for medical care.
+
+### 🌍 Travel, languages, life admin
+Translate a menu via photo. Get hidden-gem restaurant picks for a city you're visiting. Draft a polite cancellation email to your landlord. Plan a trip itinerary. Find that one website you visited last week.
+
+### 🧠 Anything else that fits in a Telegram chat
+Real-time web search via Tavily. Photo analysis via Gemini. Voice in via Whisper. Persistent memory that learns who you are — your kids' names, your allergies, your projects, your goals.
+
+**MavKa is the agent you can ask anything. It has the internet, your camera, your voice, and a long memory. It's yours.**
 
 ## Vibecoding the Easy Way
 
@@ -167,7 +211,7 @@ bash install.sh
 
 After step 3, MavKa's own AI takes over and walks you through the rest **conversationally** — in your language, on the same screen. No googling, no docs.
 
-After install: open Telegram, message your bot. Done.
+After install: open Telegram, say hi to MavKa. Done.
 
 ### Uninstall
 
@@ -175,7 +219,7 @@ After install: open Telegram, message your bot. Done.
 bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/uninstall.sh)
 ```
 
-Removes the bot, autostart, local config. **Doesn't revoke API keys** — do that yourself on each provider.
+Removes MavKa, autostart, local config. **Doesn't revoke API keys** — do that yourself on each provider.
 
 ## Privacy & Data
 
