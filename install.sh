@@ -210,6 +210,8 @@ WHITE = "\033[1;37m"
 GREY = "\033[0;37m"
 DIM = "\033[2m"
 RED = "\033[0;31m"
+YELLOW = "\033[0;33m"
+ORANGE = "\033[38;5;208m"
 NC = "\033[0m"
 
 STEPS = [
@@ -245,6 +247,9 @@ def ai_print(text):
 
 def ai_ok(text):
     print(f"  {GREEN}✓{NC} {WHITE}{text}{NC}")
+
+def ai_skip(text):
+    print(f"  {ORANGE}◌{NC} {ORANGE}{text}{NC}")
 
 def ai_warn(text):
     print(f"  {RED}⚠{NC} {GREY}{text}{NC}")
@@ -422,7 +427,7 @@ while step_idx < len(STEPS):
                 continue
             else:
                 config[field] = ""
-                ai_ok(f"{label} — skipped")
+                ai_skip(f"{label} — skipped")
                 step_idx += 1
                 break
 
