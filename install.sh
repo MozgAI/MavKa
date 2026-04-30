@@ -29,6 +29,26 @@ ok()   { echo -e "  ${GREEN}✓${NC} ${GREY}$1${NC}"; }
 warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
 fail() { echo -e "\n${RED}✗ $1${NC}"; exit 1; }
 
+# Unified step header (matches the Python AI-setup style)
+TOTAL_STEPS=9
+step_header() {
+  local idx="$1"        # 1-based
+  local label="$2"
+  local tag="$3"        # required / optional
+  local filled=$((idx - 1))
+  local empty=$((TOTAL_STEPS - filled))
+  local bar=""
+  local i
+  for ((i=0; i<filled; i++)); do bar="${bar}█"; done
+  local dots=""
+  for ((i=0; i<empty; i++)); do dots="${dots}·"; done
+  echo ""
+  echo -e "  ${DIM}─────────────────────────────────────────────────${NC}"
+  echo -e "  ${GREEN}${bar}${NC}${DIM}${dots}${NC}  ${DIM}step ${idx}/${TOTAL_STEPS}${NC}  ·  ${BOLD}${WHITE}${label}${NC}  ${DIM}${tag}${NC}"
+  echo -e "  ${DIM}─────────────────────────────────────────────────${NC}"
+  echo ""
+}
+
 # ─── Detect OS ────────────────────────────────────────────────
 detect_os() {
   case "$(uname -s)" in
@@ -166,11 +186,8 @@ set_lang() {
 
 # ─── Collect Info ─────────────────────────────────────────────
 collect_info() {
-  # Language FIRST
-  echo -e "${GREEN}${BOLD}  $L_step1${NC}"
-  echo ""
-  echo -e "  ${DIM}$L_pick_lang${NC}"
-  echo ""
+  # Step 1: Language
+  step_header 1 "Language" "required"
   echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇫🇷  ${WHITE}3${NC} ${DIM}Français${NC}"
   echo -e "  🇩🇪  ${WHITE}4${NC} ${DIM}Deutsch${NC}      🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
   echo ""
@@ -188,8 +205,7 @@ collect_info() {
 
   set_lang "$BOT_LANG"
 
-  echo ""
-  echo -e "${GREEN}${BOLD}  $L_step2${NC}"
+  step_header 2 "DeepSeek API Key" "required"
   echo -e "  ${DIM}$L_ds_brain${NC}"
   echo -e "  ${PURPLE}$L_ds_url${NC}"
   echo -e "  ${DIM}$L_ds_credit${NC}"
@@ -222,6 +238,8 @@ collect_info() {
     # Launch AI-guided setup
     export MAVKA_DS_KEY="$DEEPSEEK_KEY"
     export MAVKA_LANG="$BOT_LANG"
+    export MAVKA_STEP_OFFSET=2  # bash already covered language + deepseek
+    export MAVKA_TOTAL_STEPS=$TOTAL_STEPS
     ai_guided_setup
   else
     warn "Could not verify API key (HTTP $DS_CHECK). Continuing with manual setup..."
@@ -239,6 +257,8 @@ import json, sys, os, re, subprocess, textwrap
 
 DEEPSEEK_KEY = os.environ.get("MAVKA_DS_KEY", "")
 BOT_LANG = os.environ.get("MAVKA_LANG", "en")
+STEP_OFFSET = int(os.environ.get("MAVKA_STEP_OFFSET", "0"))
+TOTAL_STEPS = int(os.environ.get("MAVKA_TOTAL_STEPS", "7"))
 CONFIG_FILE = "/tmp/mavka-setup-config.json"
 
 LANG_NAMES = {"en": "English", "uk": "Ukrainian", "ru": "Russian", "de": "German", "fr": "French", "es": "Spanish"}
@@ -307,13 +327,15 @@ def ai_warn(text):
     print(f"  {RED}⚠{NC} {GREY}{text}{NC}")
 
 def step_header(step_idx, label, required):
-    total = len(STEPS)
-    filled = step_idx
-    bar = f"{GREEN}{'█' * filled}{DIM}{'·' * (total - filled)}{NC}"
+    # step_idx is 0-based local; convert to global with offset
+    global_idx = step_idx + STEP_OFFSET + 1   # 1-based for display
+    filled = global_idx - 1
+    empty = TOTAL_STEPS - filled
+    bar = f"{GREEN}{'█' * filled}{NC}{DIM}{'·' * empty}{NC}"
     tag = f"{DIM}required{NC}" if required else f"{DIM}optional{NC}"
     print()
     print(f"  {DIM}─────────────────────────────────────────────────{NC}")
-    print(f"  {bar}  {DIM}step {filled+1}/{total}{NC}  ·  {BOLD}{WHITE}{label}{NC}  {tag}")
+    print(f"  {bar}  {DIM}step {global_idx}/{TOTAL_STEPS}{NC}  ·  {BOLD}{WHITE}{label}{NC}  {tag}")
     print(f"  {DIM}─────────────────────────────────────────────────{NC}")
     print()
 
@@ -542,9 +564,8 @@ while step_idx < len(STEPS):
                 messages.append({"role": "assistant", "content": resp})
                 ai_print(resp)
 
-total = len(STEPS)
 print()
-print(f"  {GREEN}{'█' * total}{NC}  {DIM}{total}/{total}  all steps done{NC}")
+print(f"  {GREEN}{'█' * TOTAL_STEPS}{NC}  {DIM}{TOTAL_STEPS}/{TOTAL_STEPS}  all steps done{NC}")
 print(f"  {DIM}─────────────────────────────────────────────────{NC}")
 
 with open(CONFIG_FILE, "w") as f:
