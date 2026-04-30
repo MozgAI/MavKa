@@ -951,6 +951,12 @@ function Add-ToPath {
 Detect-OS
 Show-Header
 Set-Lang 'en'  # initial language until step 1
+
+# Beta warning — Windows installer is fresh and lightly tested
+Write-Host "  ${YELLOW}⚠ Windows installer is in BETA.${NC}"
+Write-Host "  ${DIM}Please report any issues at github.com/MozgAI/MavKa/issues${NC}"
+Write-Host ""
+
 Install-Deps
 Collect-Info
 Configure-Pi

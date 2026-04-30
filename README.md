@@ -7,7 +7,7 @@
   <a href="https://github.com/MozgAI/MavKa/stargazers"><img src="https://img.shields.io/github/stars/MozgAI/MavKa?color=8be9fd" alt="Stars"></a>
   <img src="https://img.shields.io/badge/macOS-Apple_Silicon%20%7C%20Intel-c0c0d0" alt="macOS">
   <img src="https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Arch%20%7C%20Debian-c0c0d0" alt="Linux">
-  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-c0c0d0" alt="Windows">
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011%20(beta)-ffb86c" alt="Windows beta">
   <img src="https://img.shields.io/badge/install-5_min-50fa7b" alt="Install time">
   <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
 </p>
@@ -209,13 +209,13 @@ Why DeepSeek is the recommendation: **no other provider gets you a 248B model an
 bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 ```
 
-### Windows (native PowerShell, no WSL)
+### Windows (native PowerShell, no WSL) — **BETA**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/MozgAI/mavka/main/install.ps1 | iex"
 ```
 
-Same flow, same providers, same AI-guided setup. Uses Git Bash (auto-installed via winget) for Pi Agent's shell — WSL not needed.
+> ⚠️ **Windows support is currently in BETA.** Mac/Linux are battle-tested, Windows hasn't been deeply tested yet. Same flow, same providers, same AI-guided setup. Uses Git Bash (auto-installed via winget) for Pi Agent's shell — WSL not needed. Please file an issue if anything breaks.
 
 ### Prefer to read the script first? (recommended for any one-liner install)
 
@@ -326,7 +326,7 @@ Your computer runs a lightweight Node.js process. The heavy thinking happens in 
 
 - **macOS** — Apple Silicon & Intel
 - **Linux** — Ubuntu, Debian, Fedora, Arch, ARM
-- **Windows** — Windows 10 (1809+) and Windows 11, native PowerShell, no WSL needed (uses Git Bash)
+- **Windows** — Windows 10 (1809+) and Windows 11, native PowerShell, no WSL needed (uses Git Bash). *Beta — please report bugs.*
 
 ## Daily Commands
 
