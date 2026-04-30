@@ -47,7 +47,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="deepseek-v4-flash:off"
       PROVIDER_KEY_PREFIX="sk-"
       PROVIDER_PI_NAME="deepseek"
-      PROVIDER_NOTE="Cheapest. \$2 starter credit ≈ 1 month of daily use."
+      PROVIDER_NOTE="Cheapest. \$2 starter credit lasts ~1 year of casual daily use."
       ;;
     openai)
       PROVIDER_NAME="openai"
@@ -76,11 +76,11 @@ load_provider() {
       PROVIDER_LABEL="Kimi 2.6"
       PROVIDER_URL="platform.moonshot.ai"
       PROVIDER_VERIFY_URL="https://api.moonshot.ai/v1/chat/completions"
-      PROVIDER_VERIFY_MODEL="kimi-k2-0905-preview"
-      PROVIDER_RUN_MODEL="kimi-k2-0905-preview"
+      PROVIDER_VERIFY_MODEL="kimi-k2.6"
+      PROVIDER_RUN_MODEL="kimi-k2.6"
       PROVIDER_KEY_PREFIX="sk-"
       PROVIDER_PI_NAME="moonshot"
-      PROVIDER_NOTE="Moonshot Kimi-K2. Long-context, strong on coding."
+      PROVIDER_NOTE="Moonshot Kimi-K2.6. 262K context, strong on coding."
       ;;
     groq)
       PROVIDER_NAME="groq"
@@ -155,7 +155,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (пошук): "
       L_ds_brain="DeepSeek — мозок MavKa"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 стартовий кредит — зазвичай вистачає на місяць"
+      L_ds_credit="\$2 стартового кредиту вистачає на \~рік повсякденного використання"
       L_ds_signup="Зареєструйся, поповни рахунок на \$2, створи API Key і встав сюди."
       L_verifying="Перевіряємо ключ..."
       L_ds_works="DeepSeek API ключ працює!"
@@ -200,7 +200,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (поиск): "
       L_ds_brain="DeepSeek — мозг MavKa"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 стартового кредита — обычно хватает до месяца"
+      L_ds_credit="\$2 стартового кредита хватает примерно на \~год обычного использования"
       L_ds_signup="Зарегистрируйся, пополни счёт на \$2, создай API Key и вставь сюда."
       L_verifying="Проверяем ключ..."
       L_ds_works="DeepSeek API ключ работает!"
@@ -245,7 +245,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (photos): "; L_tavily_key="Tavily API Key (web search): "
       L_ds_brain="DeepSeek — MavKa's brain"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 starter credit — usually enough for up to 1 month"
+      L_ds_credit="\$2 starter credit lasts \~1 year of casual daily use"
       L_ds_signup="Sign up, top up \$2, create an API key, and paste it here."
       L_verifying="Verifying API key..."
       L_ds_works="DeepSeek API key works!"
@@ -1125,6 +1125,8 @@ Accept input in any language, respond in ${BOT_LANG} unless asked otherwise.
 - Voice transcription: \`bash ~/mavka-bot/whisper.sh /path/audio.ogg\`
 - Text-to-speech: \`bash ~/mavka-bot/tts.sh "text" /tmp/voice.ogg\`
 - Photo analysis: \`bash ~/mavka-bot/vision.sh /path/image.jpg "question"\`
+- Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
+- Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
 
 ## Memory System — LLM Wiki Protocol
 
@@ -1469,7 +1471,160 @@ echo "  index size: $(wc -l < MEMORY.md | tr -d ' ') lines"
 echo "  log entries: $(grep -c '|' log.md 2>/dev/null || echo 0)"
 LINTEOF
   chmod +x "$MAVKA_HOME/lint.sh"
-  ok "Memory wiki seeded (LLM Wiki Protocol) + lint script"
+
+  # ── recall.sh — agent-callable retrieval over memory wiki + history ──
+  # Usage: bash ~/mavka-bot/recall.sh "query" [max=20]
+  cat > "$MAVKA_HOME/recall.sh" << 'RECALLEOF'
+#!/bin/bash
+# Search MavKa's long-term memory and conversation history for a query.
+# Returns up to N matches across:
+#   - memory wiki pages (~/mavka-bot/memory/*.md)
+#   - chat history (~/mavka-bot/history/*.jsonl)
+#   - distilled summaries (~/mavka-bot/memory/summaries/*.md)
+QUERY="$*"
+MAX="${MAX:-20}"
+[ -z "$QUERY" ] && { echo "Usage: recall.sh \"search query\""; exit 1; }
+
+MEM="$HOME/mavka-bot/memory"
+HIST="$HOME/mavka-bot/history"
+
+echo "== recall: $QUERY =="
+echo
+
+# 1. Memory wiki — case-insensitive grep with surrounding context
+if [ -d "$MEM" ]; then
+  echo "-- memory wiki --"
+  grep -rli --include='*.md' -m 1 "$QUERY" "$MEM" 2>/dev/null | head -10 | while read -r f; do
+    rel="${f#$HOME/}"
+    echo "[$rel]"
+    grep -n -i -B1 -A2 "$QUERY" "$f" 2>/dev/null | head -8
+    echo
+  done
+fi
+
+# 2. Chat history — JSONL files, search across last 30 days
+if [ -d "$HIST" ]; then
+  echo "-- chat history (last 30 days) --"
+  find "$HIST" -name '*.jsonl' -mtime -30 2>/dev/null | sort -r | while read -r f; do
+    matches=$(grep -i "$QUERY" "$f" 2>/dev/null | head -3)
+    if [ -n "$matches" ]; then
+      echo "[$(basename "$f" .jsonl)]"
+      echo "$matches" | python3 -c "
+import sys, json
+for line in sys.stdin:
+    try:
+        d = json.loads(line)
+        role = d.get('role','?')
+        text = d.get('text','')[:200]
+        ts = d.get('ts','')
+        print(f'  {ts} {role}: {text}')
+    except: pass
+" 2>/dev/null
+      echo
+    fi
+  done | head -40
+fi
+
+# 3. Summaries
+if [ -d "$MEM/summaries" ]; then
+  echo "-- distilled summaries --"
+  grep -rli "$QUERY" "$MEM/summaries" 2>/dev/null | head -5 | while read -r f; do
+    rel="${f#$HOME/}"
+    echo "[$rel]"
+    grep -n -i -B1 -A2 "$QUERY" "$f" 2>/dev/null | head -5
+    echo
+  done
+fi
+RECALLEOF
+  chmod +x "$MAVKA_HOME/recall.sh"
+
+  # ── distill.sh — weekly: summarize old chat history → summaries/ ──
+  cat > "$MAVKA_HOME/distill.sh" << 'DISTILLEOF'
+#!/bin/bash
+# Distill chat history older than 30 days into weekly summaries.
+# Schedule weekly: cron / launchd / systemd.
+HIST="$HOME/mavka-bot/history"
+SUM="$HOME/mavka-bot/memory/summaries"
+mkdir -p "$SUM"
+
+# Source API key from start.sh's environment so we can call the LLM
+[ -f "$HOME/mavka-bot/start.sh" ] && source <(grep -E '^export (DEEPSEEK|OPENAI|ANTHROPIC|GROQ|MOONSHOT)_API_KEY' "$HOME/mavka-bot/start.sh")
+
+[ -d "$HIST" ] || exit 0
+
+# Find jsonl files older than 30 days that haven't been distilled yet
+find "$HIST" -name '*.jsonl' -mtime +30 2>/dev/null | sort | while read -r f; do
+  date_tag=$(basename "$f" .jsonl)
+  out="$SUM/${date_tag}.md"
+  [ -f "$out" ] && continue   # already distilled
+
+  # Concatenate up to 200 messages
+  raw=$(head -200 "$f" | python3 -c "
+import sys, json
+for line in sys.stdin:
+    try:
+        d = json.loads(line)
+        print(f\"[{d.get('role','?')}] {d.get('text','')[:300]}\")
+    except: pass
+" 2>/dev/null)
+  [ -z "$raw" ] && continue
+
+  # Summarize via the configured AI provider (DeepSeek by default)
+  KEY="${DEEPSEEK_API_KEY:-${OPENAI_API_KEY:-}}"
+  [ -z "$KEY" ] && { echo "$date_tag — no API key, skipping"; continue; }
+
+  prompt="Summarize this day of Telegram conversation between a user and their AI assistant. Extract: (1) key decisions, (2) facts the user revealed, (3) projects discussed, (4) actions taken. Be terse, factual, no fluff. Output as markdown bullets, max 30 lines.
+
+CONVERSATION:
+$raw"
+
+  response=$(curl -s -X POST "https://api.deepseek.com/chat/completions" \
+    -H "Authorization: Bearer $KEY" \
+    -H "Content-Type: application/json" \
+    -d "$(python3 -c "
+import json, sys
+prompt = sys.argv[1]
+print(json.dumps({
+    'model': 'deepseek-chat',
+    'messages': [{'role':'user','content':prompt}],
+    'max_tokens': 1500,
+    'temperature': 0.3
+}))
+" "$prompt")")
+
+  text=$(echo "$response" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d['choices'][0]['message']['content'])
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null)
+
+  if [ -n "$text" ]; then
+    cat > "$out" << SUMEOF
+---
+name: Daily summary $date_tag
+description: AI-distilled summary of conversation on $date_tag
+type: concept
+hall: events
+valid_from: $date_tag
+---
+
+# Summary — $date_tag
+
+$text
+
+---
+*Distilled from $f on $(date +%Y-%m-%d).*
+SUMEOF
+    echo "$date_tag distilled → summaries/${date_tag}.md"
+  fi
+done
+DISTILLEOF
+  chmod +x "$MAVKA_HOME/distill.sh"
+
+  ok "Memory wiki seeded (LLM Wiki Protocol) + lint + recall + distill scripts"
 }
 
 # ─── Configure Pi Agent ───────────────────────────────────────

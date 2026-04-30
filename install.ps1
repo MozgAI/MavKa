@@ -197,7 +197,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'deepseek-chat'
             $script:PROVIDER_RUN_MODEL  = 'deepseek-v4-flash:off'
             $script:PROVIDER_PI_NAME    = 'deepseek'
-            $script:PROVIDER_NOTE       = 'Cheapest. $2 starter credit ≈ 1 month of daily use.'
+            $script:PROVIDER_NOTE       = 'Cheapest. $2 starter credit lasts ~1 year of casual daily use.'
         }
         'openai' {
             $script:PROVIDER_NAME       = 'openai'
@@ -224,10 +224,10 @@ function Load-Provider {
             $script:PROVIDER_LABEL      = 'Kimi 2.6'
             $script:PROVIDER_URL        = 'platform.moonshot.ai'
             $script:PROVIDER_VERIFY_URL = 'https://api.moonshot.ai/v1/chat/completions'
-            $script:PROVIDER_VERIFY_MODEL = 'kimi-k2-0905-preview'
-            $script:PROVIDER_RUN_MODEL  = 'kimi-k2-0905-preview'
+            $script:PROVIDER_VERIFY_MODEL = 'kimi-k2.6'
+            $script:PROVIDER_RUN_MODEL  = 'kimi-k2.6'
             $script:PROVIDER_PI_NAME    = 'moonshot'
-            $script:PROVIDER_NOTE       = 'Moonshot Kimi-K2. Long-context, strong on coding.'
+            $script:PROVIDER_NOTE       = 'Moonshot Kimi-K2.6. 262K context, strong on coding.'
         }
         'groq' {
             $script:PROVIDER_NAME       = 'groq'

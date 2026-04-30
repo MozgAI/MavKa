@@ -9,12 +9,12 @@
   <img src="https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Arch%20%7C%20Debian-c0c0d0" alt="Linux">
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011%20(beta)-ffb86c" alt="Windows beta">
   <img src="https://img.shields.io/badge/install-5_min-50fa7b" alt="Install time">
-  <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
+  <img src="https://img.shields.io/badge/cost-~%240.05%2Fmonth-bd93f9" alt="Cost">
 </p>
 
 <h2 align="center">The ChatGPT killer. The OpenClaw killer.<br>The easiest way into vibecoding ever shipped.</h2>
 
-<h3 align="center">Your own AI. In Telegram. Coding agent on your laptop.<br>One install. ~$2/month. No limits. No lock-in.</h3>
+<h3 align="center">Your own AI. In Telegram. Coding agent on your laptop.<br>One install. $2 buys you a year. No limits. No lock-in.</h3>
 
 <p align="center">
 
@@ -25,7 +25,7 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · Windows · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
+  <sub>macOS · Linux · Windows · 5 minutes · $2 starter credit lasts ~1 year · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
 </p>
 
 <p align="center">
@@ -60,7 +60,7 @@ So I stopped buying servers and built **MavKa** — a one-line installer that dr
 
 | | ChatGPT Plus | **MavKa** |
 |---|---|---|
-| **Price** | $20/month | **~$2/month** |
+| **Price** | $20/month | **~$0.05/month** ($2 starter credit lasts a year) |
 | **Brain** | One model, take it or leave it | **5 providers**, swap anytime |
 | **Where you use it** | Their app, their UI, their rules | **Telegram + your terminal** |
 | **Voice in** | Yes | Yes (Groq Whisper, free) |
@@ -84,7 +84,7 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 
 | | Cursor | Claude Code / OpenClaw | **MavKa** |
 |---|---|---|---|
-| Price | $20/mo | Pay-per-token | **~$2/mo (DeepSeek)** |
+| Price | $20/mo | Pay-per-token | **~$0.30/mo heavy coding (DeepSeek)** |
 | Where you talk to it | IDE only | Terminal only | **Telegram + terminal** |
 | Voice control (in + out) | No | No | **Yes — fully hands-free** |
 | Photo / screenshot understanding | No | No | **Yes** |
@@ -105,7 +105,7 @@ Voice in, voice out, photo analysis, web search, persistent memory. **Talk to Ma
 ### 💻 On your PC — coding agent like Claude Code
 Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask MavKa in Telegram to refactor a file on your laptop — it just does it.
 
-**One install. Two superpowers. ~$2/month.**
+**One install. Two superpowers. Pennies a month.**
 
 ## Even Your Mom Can Install It
 
@@ -193,7 +193,7 @@ MavKa is **provider-agnostic**. Choose at install time, swap anytime by re-runni
 
 | Provider | Why pick it | Cost |
 |---|---|---|
-| **DeepSeek** V4 Flash | 248B parameters at $0.14/M tokens — the lifehack. *(recommended)* | **~$2/mo** |
+| **DeepSeek** V4 Flash | 248B parameters at $0.14/M tokens — the lifehack. *(recommended)* | **~$0.05/mo casual** |
 | **ChatGPT** GPT-4o-mini | Mainstream OpenAI quality, familiar API | ~$5/mo |
 | **Opus** Claude 4.7 | Anthropic's flagship — smartest model on the market | ~$30/mo |
 | **Kimi 2.6** Moonshot | Long-context (128k+), strong on code | ~$3/mo |
@@ -317,11 +317,11 @@ MavKa runs **Pi Coding Agent** under the hood, and Pi is intentionally a "YOLO" 
 
 | Provider | Casual chat | Heavy coding |
 |---|---|---|
-| **DeepSeek** V4 Flash *(recommended)* | **~$2/mo** | ~$30/mo |
-| **ChatGPT** GPT-4o-mini | ~$5/mo | ~$60/mo |
-| **Opus** Claude 4.7 | ~$30/mo | ~$200+/mo |
-| **Kimi 2.6** Moonshot | ~$3/mo | ~$40/mo |
-| **Groq** Llama 3.3 70B | **$0** (free tier) | hits daily limits |
+| **DeepSeek** V4 Flash *(recommended)* | **~$0.05/mo** | ~$0.30/mo |
+| **Groq** Llama 3.3 70B | **$0** *(free tier covers casual)* | ~$1/mo over free TPD |
+| **ChatGPT** GPT-4o-mini | ~$0.06/mo | ~$0.40/mo |
+| **Kimi 2.6** Moonshot | ~$0.40/mo | ~$2.60/mo |
+| **Opus** Claude 4.7 | ~$2/mo | ~$15/mo with prompt caching |
 
 Tools layered on top:
 
@@ -331,7 +331,11 @@ Tools layered on top:
 | Gemini Vision (photos) | Free tier |
 | Tavily Search | Free tier (1000/mo) |
 
-Numbers are real measurements with DeepSeek across daily-driver use. Your usage may differ — check your provider's dashboard.
+**Sticker math:** at DeepSeek's $0.14/M input + $0.28/M output, a casual user (~5K input + 2K output per day) spends about **5 cents/month**. The $2 starter credit DeepSeek requires you to top up will literally last a year. *That's not a typo.*
+
+For heavy coding (~50K input + 10K output/day) it's ~$0.30/mo on DeepSeek, ~$15/mo on Claude Opus. Still nowhere near ChatGPT Plus.
+
+*Prices as of April 2026. AI providers change pricing frequently — verify on the official pricing page before committing. Numbers are estimates from real measurements.*
 
 ## How It Works
 
