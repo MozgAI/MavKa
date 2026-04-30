@@ -268,58 +268,74 @@ def call_deepseek(messages, retries=3):
     return None
 
 def validate_input(field, value):
+    """STRICT: only return value if it matches expected key format. No fallback on length."""
     v = value.strip()
     if not v:
         return None
     if field == "groq_key":
         m = re.search(r'(gsk_[A-Za-z0-9]{20,})', v)
-        return m.group(1) if m else v if len(v) > 10 else None
+        return m.group(1) if m else None
     elif field == "gemini_key":
-        m = re.search(r'(AI[A-Za-z0-9_-]{20,})', v)
-        return m.group(1) if m else v if len(v) > 10 else None
+        m = re.search(r'(AI[A-Za-z0-9_-]{30,})', v)
+        return m.group(1) if m else None
     elif field == "tavily_key":
         m = re.search(r'(tvly-[A-Za-z0-9]{10,})', v)
-        return m.group(1) if m else v if len(v) > 10 else None
+        return m.group(1) if m else None
     elif field == "telegram_token":
         m = re.search(r'(\d{8,}:[A-Za-z0-9_-]{30,})', v)
         return m.group(1) if m else None
     elif field == "telegram_id":
-        m = re.search(r'(\d{5,})', v)
+        # Must be a pure number, possibly with whitespace/punctuation around
+        m = re.fullmatch(r'\s*(\d{5,12})\s*\.?', v)
         return m.group(1) if m else None
     elif field == "bot_name":
-        return v if v else "MavKa"
+        # Bot name only accepted if input looks like a name (short, no punctuation marks like ?)
+        if len(v) <= 30 and "?" not in v and "!" not in v:
+            return v
+        return None
     elif field == "persona":
         return v
-    return v
+    return None
 
 def is_skip(text):
     t = text.strip().lower()
-    return t in ("skip", "no", "нет", "пропустить", "later", "потом", "пропуск", "-", "n", "")
+    return t in ("skip", "no", "нет", "ні", "пропустить", "пропусти", "later", "потом", "пізніше", "пропуск", "-", "n", "")
 
 SYSTEM_PROMPT = f"""You are MavKa — a setup assistant inside a terminal installer.
 You help users set up their personal AI Telegram bot.
-Respond in {lang_name}. Be concise (1-2 sentences). NO emojis. Professional but friendly tone.
 
-Guide the user through setup steps ONE AT A TIME.
-After the user provides info or skips, move to the next step immediately.
+LANGUAGE — CRITICAL:
+- Detect the language of the user's LATEST message and ALWAYS reply in that exact language.
+- Only when there is no user message yet (the very first greeting), use {lang_name}.
+- If the user switches language mid-conversation, switch with them on the next reply.
+- Never mix languages in one response.
 
-STEPS (you track which step via [STEP X] markers):
+STYLE:
+- Concise (1-2 sentences usually).
+- NO emojis.
+- Professional but warm. Treat the user like a friend who's slightly intimidated by the terminal.
+
+YOUR JOB:
+Guide the user through ONE setup step at a time. The installer prepends each turn with a [STEP X] hint telling you what to ask for. You handle the conversation; the installer extracts the actual values from user input.
+
+STEPS:
 1. groq_key — Groq API key for voice transcription. OPTIONAL. Free at console.groq.com/keys — sign up, go to API Keys, create one.
 2. gemini_key — Google Gemini API key for photo analysis. OPTIONAL. Free at aistudio.google.com/apikey — click "Create API key".
 3. tavily_key — Tavily API key for web search. OPTIONAL. Free at app.tavily.com/home — sign up, copy key from dashboard.
-4. telegram_token — Telegram Bot Token. REQUIRED. How to get it: open Telegram app, search for @BotFather, send /newbot, choose a name and username, copy the token (format: 1234567890:AAHxxxxxxx).
-5. telegram_id — Telegram numeric user ID. REQUIRED. How to get it: open Telegram, search for @userinfobot, send /start, copy the number it shows.
-6. bot_name — Name for the bot. Default: MavKa. Just ask what they want to call it.
+4. telegram_token — Telegram Bot Token. REQUIRED. How to get it: open Telegram, search for @BotFather, send /newbot, choose a name and username, copy the token (format: 1234567890:AAH...).
+5. telegram_id — Telegram numeric user ID. REQUIRED. How to get it: open Telegram, search for @userinfobot, send /start, copy the number.
+6. bot_name — Name for the bot. Default: MavKa.
 7. persona — Bot personality. Offer choices: (1) Smart assistant (2) Nutritionist (3) Chef (4) Language tutor (5) Custom description.
 
-RULES:
-- ONE step at a time. Never ask for multiple things at once.
-- Optional steps: if user says skip/no/later, acknowledge and move on.
-- Required steps (telegram_token, telegram_id): NEVER skip. Give step-by-step instructions.
-- If user pastes something, confirm briefly.
-- If user asks a question, answer it, then return to the current step.
-- NO emojis in your responses. Keep it clean and professional.
-- NEVER output CONFIG lines — the installer handles extraction separately.
+CONVERSATION RULES — VERY IMPORTANT:
+- The installer ONLY moves to the next step when the user provides a valid value OR explicitly skips an optional step.
+- If the user asks a question, expresses confusion, says they can't find the key, or just chats — answer them helpfully on the same step. DO NOT pretend they gave you the key.
+- For optional steps, accept skip phrases naturally: "skip", "later", "no", "нет", "потім", "後で" etc. Acknowledge briefly and the installer will move on.
+- For REQUIRED steps (telegram_token, telegram_id), if the user wants to skip, gently insist and walk them through getting the value step by step.
+- If the user pastes something that doesn't match the expected key format, the installer will reject it. Help them — explain what the correct format looks like, where to find it again.
+- If the user just wants to chat or asks general questions, answer briefly, then politely return to the current step.
+- NO emojis ever.
+- NEVER output CONFIG lines — the installer handles extraction.
 """
 
 messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -377,38 +393,57 @@ while step_idx < len(STEPS):
                 step_idx += 1
                 break
 
-        extracted = validate_input(field, user_input)
+        # Detect if input looks like an answer for current step.
+        # If not — treat as conversation, let AI reply, stay on this step.
+        choice = user_input.strip()
+        is_question = "?" in choice or choice.lower().startswith(("how", "what", "why", "where", "when", "can you", "could you", "как", "что", "почему", "где", "можешь", "ты можешь", "як", "що", "чому", "де", "wie", "was", "warum", "wo", "comment", "qu'est", "pourquoi", "où", "cómo", "qué", "por qué", "dónde"))
 
         if field == "persona":
-            choice = user_input.strip()
-            if choice == "1" or choice.lower() in ("smart", "assistant", "default", "1)", "умный"):
-                config["persona"] = "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. You are knowledgeable, concise, and always honest."
-            elif choice == "2" or choice.lower() in ("nutritionist", "fitness", "diet", "2)", "диетолог"):
-                config["persona"] = "an expert nutritionist and fitness coach. You analyze meals, count calories, create meal plans and workout routines. Motivating and science-based."
-            elif choice == "3" or choice.lower() in ("chef", "cook", "recipe", "3)", "повар"):
-                config["persona"] = "a professional chef and recipe expert. You suggest recipes, explain techniques clearly, and make cooking fun."
-            elif choice == "4" or choice.lower() in ("tutor", "language", "teacher", "4)", "репетитор"):
-                config["persona"] = "a patient language tutor. You help learn languages through conversation, correct mistakes gently, and adapt to the learner's level."
-            elif choice == "5" or len(choice) > 15:
-                config["persona"] = choice if len(choice) > 15 else "a smart, proactive, and friendly AI assistant."
-                messages.append({"role": "user", "content": choice})
-                resp = call_deepseek(messages)
-                if resp:
-                    messages.append({"role": "assistant", "content": resp})
-                    for line in resp.strip().split("\n"):
-                        if line.strip():
-                            ai_print(line.strip())
-            else:
-                config["persona"] = "a smart, proactive, and friendly AI assistant."
-            ai_ok(f"Personality set!")
-            step_idx += 1
-            break
+            persona_map = {
+                "1": "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. Knowledgeable, concise, always honest.",
+                "2": "an expert nutritionist and fitness coach. You analyze meals, count calories, create meal plans and workouts. Motivating and science-based.",
+                "3": "a professional chef and recipe expert. You suggest recipes, explain techniques clearly, and make cooking fun.",
+                "4": "a patient language tutor. You help learn languages through conversation, correct mistakes gently, and adapt to the learner's level.",
+            }
+            if choice in persona_map:
+                config["persona"] = persona_map[choice]
+                ai_ok("Personality set!")
+                step_idx += 1
+                break
+            elif choice == "5" or (not is_question and len(choice) > 25):
+                # Custom description — only if not a question
+                config["persona"] = choice if len(choice) > 15 else persona_map["1"]
+                ai_ok("Personality set!")
+                step_idx += 1
+                break
+            # Otherwise: question or unclear — let AI respond, stay on step
+            messages.append({"role": "user", "content": user_input})
+            resp = call_deepseek(messages)
+            if resp:
+                messages.append({"role": "assistant", "content": resp})
+                for line in resp.strip().split("\n"):
+                    if line.strip():
+                        ai_print(line.strip())
+            continue
 
         if field == "bot_name":
-            config["bot_name"] = user_input.strip() if user_input.strip() else "MavKa"
-            ai_ok(f"Bot name: {config['bot_name']}")
-            step_idx += 1
-            break
+            # Accept name only if it's clearly an answer (short, no question marks)
+            if not is_question and 1 <= len(choice) <= 30 and "!" not in choice:
+                config["bot_name"] = choice
+                ai_ok(f"Bot name: {choice}")
+                step_idx += 1
+                break
+            # Otherwise: question — let AI respond
+            messages.append({"role": "user", "content": user_input})
+            resp = call_deepseek(messages)
+            if resp:
+                messages.append({"role": "assistant", "content": resp})
+                for line in resp.strip().split("\n"):
+                    if line.strip():
+                        ai_print(line.strip())
+            continue
+
+        extracted = validate_input(field, user_input)
 
         if extracted:
             config[field] = extracted
@@ -417,6 +452,8 @@ while step_idx < len(STEPS):
             step_idx += 1
             break
         else:
+            # Not a valid key, not a skip → user is asking a question or chatting.
+            # Reply on the same step, do NOT advance.
             messages.append({"role": "user", "content": user_input})
             resp = call_deepseek(messages)
             if resp:
