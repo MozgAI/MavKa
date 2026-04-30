@@ -48,7 +48,7 @@ Then DeepSeek shipped **V4 Flash** — a **248-billion-parameter** model at **$0
 
 Read that price again.
 
-A $10,000 home server **cannot physically run a 248B model.** I'd be stuck with something half the size, half the quality. Meanwhile, the money I'd spend on hardware would cover **10 years** of DeepSeek Flash usage on the API. **Ten years.**
+A $10,000 home server **cannot physically run a 248B model.** I'd be stuck with something half the size, half the quality. Meanwhile, the money I'd spend on hardware would cover **20 years of nonstop, heavy-duty AI usage** on the API. **Twenty years.** And that's at intensive coding rates — for casual daily-driver chat, you're looking at centuries.
 
 Hardware depreciates monthly. Cloud frontier models get smarter weekly. New providers launch, prices keep dropping, and you can switch brains anytime — no lock-in.
 
