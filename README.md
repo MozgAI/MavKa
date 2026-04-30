@@ -11,9 +11,9 @@
   <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
 </p>
 
-<h2 align="center">The ChatGPT killer that fits in one bash command.</h2>
+<h2 align="center">The ChatGPT killer. The OpenClaw killer.<br>The easiest way into vibecoding ever shipped.</h2>
 
-<h3 align="center">Your own AI. In Telegram. On your machine. For the price of a coffee per month.</h3>
+<h3 align="center">Your own AI. In Telegram. Coding agent on your laptop.<br>One install. ~$2/month. No limits. No lock-in.</h3>
 
 <p align="center">
 
@@ -24,11 +24,12 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · open source</sub>
+  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · open source · MIT</sub>
 </p>
 
 <p align="center">
-  <a href="#why-mavka-kills-chatgpt-plus">Why it kills ChatGPT</a> ·
+  <a href="#why-mavka-kills-chatgpt-plus">vs ChatGPT</a> ·
+  <a href="#vibecoding-the-easy-way">Vibecoding</a> ·
   <a href="#the-math-that-broke-my-brain">The math</a> ·
   <a href="#install">Install</a> ·
   <a href="#the-real-cost">Cost</a> ·
@@ -76,6 +77,18 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 
 **MavKa is one install. Two superpowers. Five providers. Zero lock-in.**
 
+### Also better than your favorite coding tools
+
+| | Cursor | Claude Code / OpenClaw | **MavKa** |
+|---|---|---|---|
+| Price | $20/mo | Pay-per-token | **~$2/mo (DeepSeek)** |
+| Where you talk to it | IDE only | Terminal only | **Telegram + terminal** |
+| Voice control | No | No | **Yes** |
+| Photo / screenshot understanding | No | No | **Yes** |
+| Switch model providers | Limited | Limited | **5 providers, anytime** |
+| Memory across sessions | Limited | Limited | **Persistent wiki** |
+| Open source | No | No | **Yes (MIT)** |
+
 ## Two Products in One
 
 Most AI tools force a choice: a **chat app** on your phone, or a **coding agent** on your PC. MavKa is both — sharing the same brain, the same memory, the same conversation.
@@ -87,6 +100,28 @@ Voice notes, photo analysis, web search, persistent memory. No app to install. O
 Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask the bot in Telegram to refactor a file on your laptop — it just does it.
 
 **One install. Two superpowers. ~$2/month.**
+
+## Vibecoding the Easy Way
+
+You've heard the term — *vibecoding*: you describe the vibe, the AI writes the code, you review and ship. The problem is the on-ramp:
+
+- **Cursor / Windsurf** — slick, but $20/month and another IDE to learn
+- **Claude Code / OpenClaw** — powerful, but it's a CLI tool with a learning curve
+- **GitHub Copilot** — autocomplete-tier, not a real agent
+- **Local models** — slow on consumer hardware, model quality lags 6 months
+
+MavKa is different: **the same AI that just answered your voice note in Telegram is sitting in your terminal, ready to read your repo, run tests, write commits, push branches.**
+
+```
+You (in bed):    "fix the auth bug we talked about yesterday"
+MavKa (laptop):  reads ~/projects/api/auth.ts, finds the issue,
+                 runs the failing test, patches it, runs again,
+                 reports back in your Telegram with a diff
+```
+
+Same brain. Same memory. Same conversation. **One install, no IDE switch, no $20/month subscription.** The cheapest, lowest-friction entry into agentic coding that exists right now.
+
+> **If you want to start vibecoding without paying $20/month for Cursor or fighting Claude Code's CLI — MavKa is the on-ramp.**
 
 ## Pick Your Brain
 
@@ -230,5 +265,5 @@ Early days. Tested on macOS (Apple Silicon) and Arch Linux. Use at your own risk
 
 ---
 
-<p align="center"><b>Stop paying $20/month for AI you don't own.</b></p>
+<p align="center"><b>Stop paying $20/month for AI you don't own.<br>Stop fighting CLIs to ship code with AI.<br>One install. Two dollars. Forever yours.</b></p>
 <p align="center"><sub>Made with 🍃 — open source forever.</sub></p>
