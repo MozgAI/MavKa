@@ -315,9 +315,22 @@ def validate_input(field, value):
         return v
     return None
 
+SKIP_WORDS = (
+    "skip", "no", "n", "no thanks", "no thank you", "later", "next", "pass", "not now",
+    "нет", "не", "ні", "ні дякую", "пропусти", "пропустить", "пропустим", "пропуск", "пропустимо",
+    "потом", "позже", "пізніше", "пізніш", "не сейчас", "не зараз", "поки ні", "не надо",
+    "далее", "дальше", "дальній", "наступний", "следующий", "перехід", "переходим", "переходимо",
+    "не хочу", "не буду", "не треба", "без этого", "обійдусь", "обойдусь",
+    "-", "",
+)
+
 def is_skip(text):
-    t = text.strip().lower()
-    return t in ("skip", "no", "нет", "ні", "пропустить", "пропусти", "later", "потом", "пізніше", "пропуск", "-", "n", "")
+    t = text.strip().lower().rstrip(".!?,;:")
+    if t in SKIP_WORDS:
+        return True
+    # also catch phrases that contain a skip cue ("можем потом", "сделаю позже", "let's skip")
+    skip_cues = ("skip", "потом", "позже", "пізніше", "пропуст", "later", "далее", "дальше", "наступн", "следующ", "не сейчас", "не зараз", "обойд", "обійд", "без этого", "не нужно", "не треба", "без него")
+    return any(cue in t for cue in skip_cues)
 
 SYSTEM_PROMPT = f"""You are MavKa — a setup assistant inside a terminal installer.
 You help users set up their personal AI Telegram bot.
@@ -346,12 +359,13 @@ STEPS:
 7. persona — Bot personality. Offer choices: (1) Smart assistant (2) Nutritionist (3) Chef (4) Language tutor (5) Custom description.
 
 CONVERSATION RULES — VERY IMPORTANT:
-- The installer ONLY moves to the next step when the user provides a valid value OR explicitly skips an optional step.
-- If the user asks a question, expresses confusion, says they can't find the key, or just chats — answer them helpfully on the same step. DO NOT pretend they gave you the key.
-- For optional steps, accept skip phrases naturally: "skip", "later", "no", "нет", "потім", "後で" etc. Acknowledge briefly and the installer will move on.
+- The installer (not you) decides when to advance to the next step. You just talk.
+- DO NOT say "let's move to the next step" or "переходим к следующему" — when the installer is ready to advance, it will move on automatically and show a new step header. If you announce a transition that doesn't happen, the user will be confused.
+- If the user asks a question, expresses confusion, says they can't find the key — answer them helpfully on the CURRENT step. Stay focused on the current step's value.
+- If the user says skip / later / "потом" / "позже" / "пропустим" / "не сейчас" or similar — just briefly acknowledge ("Окей, можем без этого" / "ok, we can add this later"). DO NOT describe what's next — the installer will show the next step header itself.
 - For REQUIRED steps (telegram_token, telegram_id), if the user wants to skip, gently insist and walk them through getting the value step by step.
 - If the user pastes something that doesn't match the expected key format, the installer will reject it. Help them — explain what the correct format looks like, where to find it again.
-- If the user just wants to chat or asks general questions, answer briefly, then politely return to the current step.
+- If the user just wants to chat or asks general questions, answer briefly, then politely return to the current step's question.
 - NO emojis ever.
 - NEVER output CONFIG lines — the installer handles extraction.
 """
@@ -384,6 +398,11 @@ while step_idx < len(STEPS):
 
     while True:
         print()
+        # compact step indicator above prompt — always visible
+        total = len(STEPS)
+        bar = f"{GREEN}{'█' * step_idx}{DIM}{'·' * (total - step_idx)}{NC}"
+        tag = "required" if required else "optional"
+        print(f"  {DIM}{bar}  step {step_idx+1}/{total} · {label} · {tag}{NC}")
         try:
             user_input = input(f"  {CYAN}you ›{NC} ")
         except (EOFError, KeyboardInterrupt):
