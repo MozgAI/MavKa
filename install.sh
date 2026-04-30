@@ -188,8 +188,8 @@ set_lang() {
 collect_info() {
   # Step 1: Language
   step_header 1 "Language" "required"
-  echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇫🇷  ${WHITE}3${NC} ${DIM}Français${NC}"
-  echo -e "  🇩🇪  ${WHITE}4${NC} ${DIM}Deutsch${NC}      🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
+  echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇩🇪  ${WHITE}3${NC} ${DIM}Deutsch${NC}"
+  echo -e "  🇫🇷  ${WHITE}4${NC} ${DIM}Français${NC}     🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
   echo ""
   echo -e "  ${DIM}Pick / Оберіть / Choisissez (1–6)${NC}"
 
@@ -197,8 +197,8 @@ collect_info() {
   case "${LANG_CHOICE:-1}" in
     1) BOT_LANG="en" ;;
     2) BOT_LANG="uk" ;;
-    3) BOT_LANG="fr" ;;
-    4) BOT_LANG="de" ;;
+    3) BOT_LANG="de" ;;
+    4) BOT_LANG="fr" ;;
     5) BOT_LANG="es" ;;
     6) BOT_LANG="ru" ;;
     *) BOT_LANG="en" ;;
