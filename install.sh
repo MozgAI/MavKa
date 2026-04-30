@@ -255,12 +255,15 @@ def ai_print(text):
                 print(f"     {GREEN}{line}{NC}")
 
 def ai_ok(text):
+    print()
     print(f"  {GREEN}✓{NC} {WHITE}{text}{NC}")
 
 def ai_skip(text):
+    print()
     print(f"  {ORANGE}◌{NC} {ORANGE}{text}{NC}")
 
 def ai_warn(text):
+    print()
     print(f"  {RED}⚠{NC} {GREY}{text}{NC}")
 
 def step_header(step_idx, label, required):
