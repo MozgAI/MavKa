@@ -191,7 +191,7 @@ collect_info() {
   echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇫🇷  ${WHITE}3${NC} ${DIM}Français${NC}"
   echo -e "  🇩🇪  ${WHITE}4${NC} ${DIM}Deutsch${NC}      🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
   echo ""
-  echo -e "  ${DIM}Pick / Виберіть / Выберите (1–6)${NC}"
+  echo -e "  ${DIM}Pick / Оберіть / Choisissez (1–6)${NC}"
 
   read -p "  ▸ " LANG_CHOICE
   case "${LANG_CHOICE:-1}" in
