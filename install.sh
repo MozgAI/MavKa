@@ -1,9 +1,12 @@
 #!/bin/bash
 # MavKa 🍃 — Your personal AI assistant in Telegram
-# One script. 5 minutes. Less than $1/month.
+# One script. 5 minutes. Pennies a month.
 #
-# Usage: bash install.sh
-# Or:    curl -sL https://mavka.app/install.sh | bash
+# Recommended:  bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
+# Or local:     bash install.sh
+#
+# DO NOT pipe via `curl ... | bash` — this script is interactive (read prompts) and stdin
+# piping breaks the prompts. Use process substitution `bash <(curl ...)` instead.
 #
 # Supports: macOS (Apple Silicon & Intel), Linux (x86_64, ARM)
 # Requires: internet connection
@@ -65,7 +68,8 @@ load_provider() {
       PROVIDER_LABEL="Opus"
       PROVIDER_URL="console.anthropic.com"
       PROVIDER_VERIFY_URL="https://api.anthropic.com/v1/messages"
-      PROVIDER_VERIFY_MODEL="claude-opus-4-7"
+      # Verify with Haiku (cheap "hi" probe) but RUN with Opus (flagship)
+      PROVIDER_VERIFY_MODEL="claude-haiku-4-5"
       PROVIDER_RUN_MODEL="claude-opus-4-7"
       PROVIDER_KEY_PREFIX="sk-ant-"
       PROVIDER_PI_NAME="anthropic"
@@ -79,7 +83,7 @@ load_provider() {
       PROVIDER_VERIFY_MODEL="kimi-k2.6"
       PROVIDER_RUN_MODEL="kimi-k2.6"
       PROVIDER_KEY_PREFIX="sk-"
-      PROVIDER_PI_NAME="moonshot"
+      PROVIDER_PI_NAME="moonshotai"
       PROVIDER_NOTE="Moonshot Kimi-K2.6. 262K context, strong on coding."
       ;;
     groq)
@@ -568,8 +572,8 @@ def validate_input(field, value):
         m = re.search(r'(\d{8,}:[A-Za-z0-9_-]{30,})', v)
         return m.group(1) if m else None
     elif field == "telegram_id":
-        # Must be a pure number, possibly with whitespace/punctuation around
-        m = re.fullmatch(r'\s*(\d{5,12})\s*\.?', v)
+        # Channels and bot accounts can have 13-15 digit IDs, regular users 9-12.
+        m = re.fullmatch(r'\s*(\d{5,15})\s*\.?', v)
         return m.group(1) if m else None
     elif field == "bot_name":
         # Bot name only accepted if input looks like a name (short, no punctuation marks like ?)
@@ -1273,22 +1277,22 @@ fi
 echo "" >> "\$PROMPT_FILE"
 echo "## FROZEN CORE" >> "\$PROMPT_FILE"
 echo "" >> "\$PROMPT_FILE"
-# Inline only the frozen pages (user_profile + feedback_*) — they're stable
-# and small. Everything else is read on demand.
+# Inline only the frozen pages (user_profile + real feedback_*.md) — they're stable
+# and small. Everything else is read on demand. The template is excluded — it's a reference,
+# not a rule.
 for f in "\$HOME/mavka-bot/memory/user_profile.md" "\$HOME/mavka-bot/memory/feedback_"*.md; do
   [ -f "\$f" ] || continue
+  case "\$(basename \$f)" in
+    feedback_template.md) continue ;;
+  esac
   echo "### \$(basename \$f)" >> "\$PROMPT_FILE"
   cat "\$f" >> "\$PROMPT_FILE"
   echo "" >> "\$PROMPT_FILE"
 done
 
-# Conditionally load Pi's sandbox extension if configured
-SANDBOX_FLAG=""
-if [ -f "\$HOME/.pi/agent/extensions/sandbox.json" ] && [ -d "\$HOME/.pi/agent/extensions/sandbox" ]; then
-  SANDBOX_FLAG="-e sandbox"
-fi
-
-exec pi --provider ${PROVIDER_PI_NAME} --model ${PROVIDER_RUN_MODEL} \$SANDBOX_FLAG \\
+# Pi auto-discovers extensions in ~/.pi/agent/extensions/. The sandbox extension
+# (if installed) loads automatically — no flag needed.
+exec pi --provider ${PROVIDER_PI_NAME} --model ${PROVIDER_RUN_MODEL} \\
    --append-system-prompt "\$PROMPT_FILE"
 STARTEOF
   chmod +x "$MAVKA_HOME/start.sh"
@@ -1429,12 +1433,16 @@ echo
 cd "$MEM" || exit 1
 
 # Collect all .md files in memory/ (excluding raw/ and summaries/)
-ALL=$(find . -maxdepth 1 -name '*.md' -not -name 'MEMORY.md' -not -name 'log.md' | sed 's|^\./||' | sort)
+# NUL-delimited so filenames with spaces work
+files=()
+while IFS= read -r -d '' f; do
+  files+=("${f#./}")
+done < <(find . -maxdepth 1 -name '*.md' -not -name 'MEMORY.md' -not -name 'log.md' -print0)
 
 # Orphans: files not referenced from MEMORY.md
 echo "-- Orphans (files not listed in MEMORY.md) --"
-for f in $ALL; do
-  if ! grep -q "$f" MEMORY.md 2>/dev/null; then
+for f in "${files[@]}"; do
+  if ! grep -qF "$f" MEMORY.md 2>/dev/null; then
     echo "  orphan: $f"
   fi
 done
@@ -1451,14 +1459,14 @@ echo
 # Stale: pages with valid_from older than 60 days and no recent activity in log.md
 echo "-- Stale pages (valid_from > 60 days, no recent INGEST in log) --"
 NOW=$(date +%s)
-for f in $ALL; do
+for f in "${files[@]}"; do
   vf=$(grep -m1 '^valid_from:' "$f" 2>/dev/null | awk '{print $2}')
   [ -n "$vf" ] || continue
   vf_s=$(date -j -f "%Y-%m-%d" "$vf" +%s 2>/dev/null || date -d "$vf" +%s 2>/dev/null)
   [ -n "$vf_s" ] || continue
   age=$(( (NOW - vf_s) / 86400 ))
   if [ "$age" -gt 60 ]; then
-    if ! grep -q "$f" log.md 2>/dev/null; then
+    if ! grep -qF "$f" log.md 2>/dev/null; then
       echo "  stale: $f (valid_from $vf, age ${age}d, never touched in log)"
     fi
   fi
@@ -1466,7 +1474,7 @@ done
 echo
 
 echo "-- Summary --"
-echo "  pages: $(echo "$ALL" | wc -l | tr -d ' ')"
+echo "  pages: ${#files[@]}"
 echo "  index size: $(wc -l < MEMORY.md | tr -d ' ') lines"
 echo "  log entries: $(grep -c '|' log.md 2>/dev/null || echo 0)"
 LINTEOF
@@ -1659,25 +1667,39 @@ TGJSON
 PIJSON
 
   # Build auth.json with all provided keys.
-  # The chosen LLM provider goes under its own Pi Agent provider name.
-  # Groq + Gemini for tools (whisper / vision) go in regardless of LLM choice.
-  python3 -c "
-import json
+  # IMPORTANT: keys are passed via env vars (NOT bash interpolated into Python source) —
+  # prevents code injection if a key contains quotes, backslashes, or $(...).
+  AUTH_JSON_OUT="$HOME/.pi/agent/auth.json" \
+  AI_KEY="${PROVIDER_KEY:-$DEEPSEEK_KEY}" \
+  AI_PROV="${PROVIDER_PI_NAME:-deepseek}" \
+  GROQ_KEY="${GROQ_KEY}" \
+  GEMINI_KEY="${GEMINI_KEY}" \
+  python3 - <<'PYEOF'
+import json, os
 auth = {}
-ai_key   = '${PROVIDER_KEY:-$DEEPSEEK_KEY}'
-ai_prov  = '${PROVIDER_PI_NAME:-deepseek}'
-groq_key = '${GROQ_KEY}'
-gem_key  = '${GEMINI_KEY}'
-if ai_key:   auth[ai_prov] = {'type': 'api_key', 'key': ai_key}
-# Groq is also used as a tool (Whisper); only add as separate entry if it's not the LLM provider
-if groq_key and ai_prov != 'groq': auth['groq'] = {'type': 'api_key', 'key': groq_key}
-elif groq_key and ai_prov == 'groq' and groq_key != ai_key:
-    # User entered a different Groq key for voice — keep one canonical entry
-    pass
-if gem_key:  auth['google'] = {'type': 'api_key', 'key': gem_key}
-with open('$HOME/.pi/agent/auth.json', 'w') as f:
+ai_key   = os.environ.get('AI_KEY', '')
+ai_prov  = os.environ.get('AI_PROV', 'deepseek')
+groq_key = os.environ.get('GROQ_KEY', '')
+gem_key  = os.environ.get('GEMINI_KEY', '')
+out_path = os.environ.get('AUTH_JSON_OUT', '')
+
+if ai_key:
+    auth[ai_prov] = {'type': 'api_key', 'key': ai_key}
+# Groq is also used as a tool (Whisper) — only add as separate entry if it's not the LLM provider
+if groq_key and ai_prov != 'groq':
+    auth['groq'] = {'type': 'api_key', 'key': groq_key}
+if gem_key:
+    auth['google'] = {'type': 'api_key', 'key': gem_key}
+
+with open(out_path, 'w') as f:
     json.dump(auth, f, indent=2)
-"
+os.chmod(out_path, 0o600)
+PYEOF
+
+  # Lock down telegram.json + auth.json (mode 0600 — SECURITY.md claims this)
+  # start.sh exports keys, so it stays executable by owner only (0700, not 0600 — needs +x for autostart)
+  chmod 600 "$HOME/.pi/agent/telegram.json" "$HOME/.pi/agent/auth.json" 2>/dev/null || true
+  [ -f "$MAVKA_HOME/start.sh" ] && chmod 700 "$MAVKA_HOME/start.sh"
 
   ok "Pi Agent configured"
 
@@ -1730,18 +1752,22 @@ setup_sandbox() {
 }
 SANDBOXJSON
 
-  # Linux: bubblewrap is required by sandbox-runtime
+  # Linux: sandbox-runtime needs bubblewrap + socat + ripgrep
   if [ "$OS" = "linux" ]; then
-    if ! command -v bwrap >/dev/null 2>&1; then
-      info "Installing bubblewrap (sandbox runtime)..."
+    NEED=""
+    command -v bwrap     >/dev/null 2>&1 || NEED="$NEED bubblewrap"
+    command -v socat     >/dev/null 2>&1 || NEED="$NEED socat"
+    command -v rg        >/dev/null 2>&1 || NEED="$NEED ripgrep"
+    if [ -n "$NEED" ]; then
+      info "Installing sandbox dependencies:$NEED"
       if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get install -y bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+        sudo apt-get install -y $NEED >/dev/null 2>&1 || warn "Sandbox deps install failed — sandbox may be disabled"
       elif command -v pacman >/dev/null 2>&1; then
-        sudo pacman -S --noconfirm bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+        sudo pacman -S --noconfirm $NEED >/dev/null 2>&1 || warn "Sandbox deps install failed — sandbox may be disabled"
       elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y bubblewrap >/dev/null 2>&1 || warn "bubblewrap install failed — sandbox will be disabled"
+        sudo dnf install -y $NEED >/dev/null 2>&1 || warn "Sandbox deps install failed — sandbox may be disabled"
       else
-        warn "Could not auto-install bubblewrap. Install manually for sandbox to work."
+        warn "Could not auto-install $NEED — install manually for sandbox to work."
       fi
     fi
   fi
@@ -1889,7 +1915,9 @@ setup_autostart() {
 </dict>
 </plist>
 PLISTEOF
-    launchctl load "$PLIST_PATH" 2>/dev/null
+    # Unload old version first so re-running the installer doesn't error under set -e
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    launchctl load "$PLIST_PATH" 2>/dev/null || true
     ok "LaunchAgent created (auto-start on login)"
 
   elif [ "$OS" = "linux" ]; then
@@ -1912,8 +1940,8 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin:${HOME}/.nvm/versions/node/v22.22.
 [Install]
 WantedBy=default.target
 SVCEOF
-    systemctl --user daemon-reload 2>/dev/null
-    systemctl --user enable mavka 2>/dev/null
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable mavka 2>/dev/null || true
     ok "Systemd service created (auto-start on login)"
   fi
 }

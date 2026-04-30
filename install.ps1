@@ -214,7 +214,8 @@ function Load-Provider {
             $script:PROVIDER_LABEL      = 'Opus'
             $script:PROVIDER_URL        = 'console.anthropic.com'
             $script:PROVIDER_VERIFY_URL = 'https://api.anthropic.com/v1/messages'
-            $script:PROVIDER_VERIFY_MODEL = 'claude-opus-4-7'
+            # Verify with cheap Haiku probe; runtime uses Opus
+            $script:PROVIDER_VERIFY_MODEL = 'claude-haiku-4-5'
             $script:PROVIDER_RUN_MODEL  = 'claude-opus-4-7'
             $script:PROVIDER_PI_NAME    = 'anthropic'
             $script:PROVIDER_NOTE       = 'Claude Opus 4.7 — flagship reasoning. Higher cost.'
@@ -226,7 +227,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_URL = 'https://api.moonshot.ai/v1/chat/completions'
             $script:PROVIDER_VERIFY_MODEL = 'kimi-k2.6'
             $script:PROVIDER_RUN_MODEL  = 'kimi-k2.6'
-            $script:PROVIDER_PI_NAME    = 'moonshot'
+            $script:PROVIDER_PI_NAME    = 'moonshotai'
             $script:PROVIDER_NOTE       = 'Moonshot Kimi-K2.6. 262K context, strong on coding.'
         }
         'groq' {
@@ -763,27 +764,29 @@ function Configure-Pi {
     }
     $auth | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'auth.json') -Encoding UTF8
 
-    # telegram.json
+    # telegram.json — schema MUST match install.sh / pi-telegram TelegramConfig:
+    # { botToken: string, allowedUserId: number, lastUpdateId: number }
     $tg = @{
-        token = $script:TG_TOKEN
-        allowed_user_ids = @([int64]$script:TG_USER_ID)
+        botToken = $script:TG_TOKEN
+        allowedUserId = [int64]$script:TG_USER_ID
+        lastUpdateId = 0
     }
     $tg | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'telegram.json') -Encoding UTF8
 
-    # settings.json — point Pi at Git Bash if not already configured
+    # settings.json — pi schema uses `packages` for git/npm extensions, not `extensions`
+    $settingsObj = @{
+        packages = @(
+            'git:github.com/badlogic/pi-telegram',
+            'git:github.com/badlogic/pi-skills'
+        )
+    }
     $gitBash = "C:\Program Files\Git\bin\bash.exe"
     if (Test-Path $gitBash) {
-        $settings = @{
-            shellPath = $gitBash
-            extensions = @(
-                'git:github.com/badlogic/pi-telegram',
-                'git:github.com/badlogic/pi-skills'
-            )
-        }
-        $settings | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'settings.json') -Encoding UTF8
+        $settingsObj.shellPath = $gitBash
     } else {
         warn "Git Bash not found at $gitBash. Pi Agent may need manual shell configuration."
     }
+    $settingsObj | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'settings.json') -Encoding UTF8
 
     ok "Pi Agent configured"
 }
@@ -796,39 +799,192 @@ function Create-Files {
     $script:MAVKA_HOME = Join-Path $env:USERPROFILE 'mavka-bot'
     New-Item -ItemType Directory -Force -Path $script:MAVKA_HOME | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $script:MAVKA_HOME 'memory') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:MAVKA_HOME 'memory\raw') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:MAVKA_HOME 'memory\summaries') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $script:MAVKA_HOME 'history') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $script:MAVKA_HOME 'logs') | Out-Null
 
-    # IDENTITY prompt
+    # IDENTITY prompt with full LLM Wiki Protocol (mirrors install.sh)
     $identity = @"
-# IDENTITY
+# $($script:BOT_NAME) 🍃
 
 You are $($script:BOT_NAME) — $($script:PERSONA)
 
 You communicate via Telegram. The user is your owner.
 
+## Core Rules
+1. ALWAYS HONEST — never fabricate facts. If unknown, say so and search.
+2. DO NO HARM TO DATA — never delete files. Never share user data.
+3. SPEND NO MONEY — never purchase or subscribe.
+4. VERIFY BEFORE STATING — check facts online before asserting.
+
 ## Tools available
 - Web search (Tavily)
 - Voice transcription (Groq Whisper)
 - Photo analysis (Gemini Vision)
-- Text-to-speech (Edge TTS)
+- Text-to-speech (tts.cmd)
 - File system access on the user's machine
-- Persistent memory in ~/mavka-bot/memory/
+- Memory recall: `bash recall.sh "query"` (search wiki + history + summaries)
+
+## Memory System — LLM Wiki Protocol
+
+You have persistent long-term memory at \`%USERPROFILE%\mavka-bot\memory\\\`. This is your "second brain."
+
+Structure:
+- MEMORY.md          ← INDEX, lean (≤200 lines), one line per page
+- log.md             ← append-only audit (INGEST/QUERY/LINT)
+- user_profile.md    ← FROZEN: who the user is
+- feedback_*.md      ← FROZEN: rules of behavior the user gave you
+- project_*.md       ← active projects, goals, deadlines
+- concept_*.md       ← generalizing pages
+
+Page frontmatter:
+``````
+---
+name: <title>
+description: <one-line retrieval hook>
+type: user | feedback | project | reference | concept
+hall: facts | events | discoveries | preferences | advice
+frozen: true (optional)
+valid_from: YYYY-MM-DD (optional)
+ended: YYYY-MM-DD (optional)
+---
+``````
+
+ON EVERY TURN — read MEMORY.md (index is in your system prompt). Open relevant pages on demand via your read tool.
+
+ON LEARNING SOMETHING NEW — INGEST:
+1. Decide which page it belongs to (or create with proper frontmatter).
+2. NEVER overwrite a frozen page — only add cross-links [[other.md]].
+3. Update temporal fields if facts have a lifecycle.
+4. Append a one-line entry to log.md: \`YYYY-MM-DD HH:MM | INGEST | <what> → <pages>\`
+5. New pages get a one-line pointer in MEMORY.md (≤150 chars).
+
+NEVER delete a page without explicit user confirmation. Don't write chat logs into memory — memory is for facts, decisions, preferences.
 
 ## Communication style
 - Warm but concise
 - Match the user's language automatically
 - For long answers, format with line breaks
-- For voice messages, use the tts.cmd helper to reply with audio
+- For voice messages, use tts.cmd to reply with audio
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'IDENTITY.md') -Value $identity -Encoding UTF8
 
-    # run.cmd — what schtasks invokes on logon
+    # Seed memory wiki (mirrors install.sh:982 area)
+    $today = Get-Date -Format 'yyyy-MM-dd'
+    $now   = Get-Date -Format 'yyyy-MM-dd HH:mm'
+
+    $memIndex = Join-Path $script:MAVKA_HOME 'memory\MEMORY.md'
+    if (-not (Test-Path $memIndex)) {
+        $memIdxContent = @"
+# Memory Index
+
+This is the lean index of $($script:BOT_NAME)'s long-term memory. Each line is one wiki page.
+Keep this file under 200 lines. One line per page, ≤150 chars per line.
+Format: ``- [Title](file.md) — one-line hook``
+
+## User
+- [user_profile.md](user_profile.md) — basic user info (will fill in as we talk)
+
+## Feedback / Rules of behavior
+(none yet — when the user gives me a rule, I'll create a feedback_*.md page)
+
+## Projects
+(none yet — when the user mentions an active project, I'll create a project_*.md page)
+
+## Concepts
+(none yet — broad cross-cutting topics)
+
+## Reference
+(none yet — pointers to external systems / docs)
+"@
+        Set-Content -Path $memIndex -Value $memIdxContent -Encoding UTF8
+    }
+
+    $logPath = Join-Path $script:MAVKA_HOME 'memory\log.md'
+    if (-not (Test-Path $logPath)) {
+        Set-Content -Path $logPath -Value @"
+# Memory Log
+
+Append-only chronology: INGEST / QUERY / LINT.
+Format: ``YYYY-MM-DD HH:MM | OP | details``
+
+---
+
+$now | INIT | $($script:BOT_NAME) memory wiki created (LLM Wiki Protocol).
+"@ -Encoding UTF8
+    }
+
+    $upPath = Join-Path $script:MAVKA_HOME 'memory\user_profile.md'
+    if (-not (Test-Path $upPath)) {
+        Set-Content -Path $upPath -Value @"
+---
+name: User profile
+description: Core facts about the person I'm talking to
+type: user
+hall: facts
+frozen: true
+valid_from: $today
+---
+
+# User profile
+
+## Basics
+- Name: unknown
+- Location: unknown
+- Role: unknown
+- Languages: unknown
+
+## Family
+- (will add as I learn)
+
+## Goals (long-term)
+- (will add as I learn)
+
+## Health / preferences
+- (will add as I learn)
+
+---
+
+Frozen. To update an existing fact, mark old line with ``(ended: YYYY-MM-DD)`` and add the new fact below.
+"@ -Encoding UTF8
+    }
+
+    # run.cmd — schtasks invokes this on logon. Builds the system prompt
+    # by concatenating IDENTITY.md + MEMORY.md + frozen pages, then exec'ing pi.
     $runCmd = @"
 @echo off
+setlocal
 cd /d "%USERPROFILE%\mavka-bot"
 echo %DATE% %TIME%: Starting MavKa... >> mavka.log
+
 where pi >nul 2>&1 || (echo pi command not on PATH >> mavka.log & exit /b 1)
-pi --provider $($script:PROVIDER_PI_NAME) --model $($script:PROVIDER_RUN_MODEL) --append-system-prompt "%USERPROFILE%\mavka-bot\IDENTITY.md" >> mavka.log 2>&1
+
+set PROMPT_FILE=%TEMP%\mavka-prompt.md
+copy /Y "%USERPROFILE%\mavka-bot\IDENTITY.md" "%PROMPT_FILE%" >nul
+
+echo. >> "%PROMPT_FILE%"
+echo ## MEMORY INDEX >> "%PROMPT_FILE%"
+echo. >> "%PROMPT_FILE%"
+if exist "%USERPROFILE%\mavka-bot\memory\MEMORY.md" type "%USERPROFILE%\mavka-bot\memory\MEMORY.md" >> "%PROMPT_FILE%"
+
+echo. >> "%PROMPT_FILE%"
+echo ## FROZEN CORE >> "%PROMPT_FILE%"
+echo. >> "%PROMPT_FILE%"
+if exist "%USERPROFILE%\mavka-bot\memory\user_profile.md" (
+    echo ### user_profile.md >> "%PROMPT_FILE%"
+    type "%USERPROFILE%\mavka-bot\memory\user_profile.md" >> "%PROMPT_FILE%"
+    echo. >> "%PROMPT_FILE%"
+)
+for %%F in ("%USERPROFILE%\mavka-bot\memory\feedback_*.md") do (
+    if /i not "%%~nxF"=="feedback_template.md" (
+        echo ### %%~nxF >> "%PROMPT_FILE%"
+        type "%%F" >> "%PROMPT_FILE%"
+        echo. >> "%PROMPT_FILE%"
+    )
+)
+
+pi --provider $($script:PROVIDER_PI_NAME) --model $($script:PROVIDER_RUN_MODEL) --append-system-prompt "%PROMPT_FILE%" >> mavka.log 2>&1
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'run.cmd') -Value $runCmd -Encoding ASCII
 

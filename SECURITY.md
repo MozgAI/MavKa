@@ -61,13 +61,13 @@ Or manually:
 tmux kill-session -t mavka 2>/dev/null
 
 # Disable autostart
-launchctl unload ~/Library/LaunchAgents/ai.mavka.bot.plist 2>/dev/null    # macOS
+launchctl unload ~/Library/LaunchAgents/com.mavka.bot.plist 2>/dev/null    # macOS
 systemctl --user disable --now mavka 2>/dev/null                          # Linux
 
 # Remove files
 rm -rf ~/mavka-bot
 rm -rf ~/.pi/agent
-rm -f ~/Library/LaunchAgents/ai.mavka.bot.plist
+rm -f ~/Library/LaunchAgents/com.mavka.bot.plist
 rm -f ~/.config/systemd/user/mavka.service
 ```
 

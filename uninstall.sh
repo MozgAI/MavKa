@@ -32,7 +32,7 @@ screen -S mavka -X quit 2>/dev/null && echo -e "${GREEN}✓${NC} screen session 
 echo ""
 echo -e "${DIM}Disabling autostart...${NC}"
 if [[ "$OS" == "Darwin" ]]; then
-  PLIST="$HOME/Library/LaunchAgents/ai.mavka.bot.plist"
+  PLIST="$HOME/Library/LaunchAgents/com.mavka.bot.plist"
   if [[ -f "$PLIST" ]]; then
     launchctl unload "$PLIST" 2>/dev/null || true
     rm -f "$PLIST"
