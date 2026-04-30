@@ -30,7 +30,60 @@ warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
 fail() { echo -e "\n${RED}✗ $1${NC}"; exit 1; }
 
 # Unified step header (matches the Python AI-setup style)
-TOTAL_STEPS=9
+TOTAL_STEPS=10
+
+# ─── AI Providers Catalog ──────────────────────────────────────
+# Set by select_provider(): PROVIDER_NAME, PROVIDER_LABEL, PROVIDER_URL,
+# PROVIDER_VERIFY_URL, PROVIDER_VERIFY_MODEL, PROVIDER_RUN_MODEL,
+# PROVIDER_KEY_PREFIX, PROVIDER_PI_NAME, PROVIDER_NOTE.
+load_provider() {
+  case "$1" in
+    deepseek)
+      PROVIDER_NAME="deepseek"
+      PROVIDER_LABEL="DeepSeek"
+      PROVIDER_URL="platform.deepseek.com"
+      PROVIDER_VERIFY_URL="https://api.deepseek.com/chat/completions"
+      PROVIDER_VERIFY_MODEL="deepseek-chat"
+      PROVIDER_RUN_MODEL="deepseek-v4-flash:off"
+      PROVIDER_KEY_PREFIX="sk-"
+      PROVIDER_PI_NAME="deepseek"
+      PROVIDER_NOTE="Cheapest. \$2 starter credit ≈ 1 month of daily use."
+      ;;
+    openai)
+      PROVIDER_NAME="openai"
+      PROVIDER_LABEL="OpenAI"
+      PROVIDER_URL="platform.openai.com"
+      PROVIDER_VERIFY_URL="https://api.openai.com/v1/chat/completions"
+      PROVIDER_VERIFY_MODEL="gpt-4o-mini"
+      PROVIDER_RUN_MODEL="gpt-4o-mini"
+      PROVIDER_KEY_PREFIX="sk-"
+      PROVIDER_PI_NAME="openai"
+      PROVIDER_NOTE="GPT-4o-mini. \$5 starter credit ≈ 2-3 weeks of daily use."
+      ;;
+    anthropic)
+      PROVIDER_NAME="anthropic"
+      PROVIDER_LABEL="Anthropic"
+      PROVIDER_URL="console.anthropic.com"
+      PROVIDER_VERIFY_URL="https://api.anthropic.com/v1/messages"
+      PROVIDER_VERIFY_MODEL="claude-haiku-4-5"
+      PROVIDER_RUN_MODEL="claude-haiku-4-5"
+      PROVIDER_KEY_PREFIX="sk-ant-"
+      PROVIDER_PI_NAME="anthropic"
+      PROVIDER_NOTE="Claude Haiku 4.5. \$5 starter credit ≈ 2 weeks of daily use."
+      ;;
+    groq)
+      PROVIDER_NAME="groq"
+      PROVIDER_LABEL="Groq"
+      PROVIDER_URL="console.groq.com"
+      PROVIDER_VERIFY_URL="https://api.groq.com/openai/v1/chat/completions"
+      PROVIDER_VERIFY_MODEL="llama-3.3-70b-versatile"
+      PROVIDER_RUN_MODEL="llama-3.3-70b-versatile"
+      PROVIDER_KEY_PREFIX="gsk_"
+      PROVIDER_PI_NAME="groq"
+      PROVIDER_NOTE="Free tier with daily limits. Fastest inference."
+      ;;
+  esac
+}
 step_header() {
   local idx="$1"        # 1-based
   local label="$2"
@@ -206,28 +259,57 @@ collect_info() {
 
   set_lang "$BOT_LANG"
 
-  step_header 2 "DeepSeek API Key" "required"
-  echo -e "  ${DIM}$L_ds_brain ${NC}🍃${DIM}  —  ${PURPLE}$L_ds_url${NC}"
-  echo -e "  ${DIM}$L_ds_credit${NC}"
+  # Step 2: AI Provider
+  step_header 2 "AI Provider" "required"
+  echo -e "  ${DIM}Pick the brain that powers your bot. You can switch later.${NC}"
+  echo ""
+  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}    ${DIM}— cheapest. ~\$2/month for casual use. (recommended)${NC}"
+  echo -e "  ${WHITE}2${NC} ${BOLD}OpenAI${NC}      ${DIM}— GPT-4o-mini. ~\$5/month, mainstream choice.${NC}"
+  echo -e "  ${WHITE}3${NC} ${BOLD}Anthropic${NC}   ${DIM}— Claude Haiku 4.5. ~\$5-10/month, smartest small model.${NC}"
+  echo -e "  ${WHITE}4${NC} ${BOLD}Groq${NC}        ${DIM}— Llama 3.3 70B. Free tier, fastest, daily limits.${NC}"
+  echo ""
+
+  read -p "  ▸ " PROV_CHOICE
+  case "${PROV_CHOICE:-1}" in
+    1) load_provider "deepseek" ;;
+    2) load_provider "openai" ;;
+    3) load_provider "anthropic" ;;
+    4) load_provider "groq" ;;
+    *) load_provider "deepseek" ;;
+  esac
+
+  # Step 3: API Key for chosen provider
+  step_header 3 "${PROVIDER_LABEL} API Key" "required"
+  echo -e "  ${DIM}${PROVIDER_LABEL} — MavKa's brain ${NC}🍃${DIM}  —  ${PURPLE}${PROVIDER_URL}${NC}"
+  echo -e "  ${DIM}${PROVIDER_NOTE}${NC}"
   echo ""
 
   while true; do
-    read -p "  $L_deepseek_key" DEEPSEEK_KEY
-    [ -n "$DEEPSEEK_KEY" ] && break
-    echo -e "  ${RED}⚠ DeepSeek API Key — $L_required${NC}"
-    echo -e "  ${DIM}  $L_ds_signup${NC}"
+    read -p "  ${PROVIDER_LABEL} API Key: " PROVIDER_KEY
+    [ -n "$PROVIDER_KEY" ] && break
+    echo -e "  ${RED}⚠ ${PROVIDER_LABEL} API Key — $L_required${NC}"
+    echo -e "  ${DIM}  Sign up at ${PROVIDER_URL}, create an API key, paste it here.${NC}"
   done
 
-  # Verify DeepSeek key works
+  # Verify the key against the chosen provider
   info "$L_verifying"
-  DS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
-    -H "Authorization: Bearer $DEEPSEEK_KEY" \
-    -H "Content-Type: application/json" \
-    -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"hi"}],"max_tokens":1}' \
-    "https://api.deepseek.com/chat/completions" 2>/dev/null)
+  if [ "$PROVIDER_NAME" = "anthropic" ]; then
+    KEY_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+      -H "x-api-key: $PROVIDER_KEY" \
+      -H "anthropic-version: 2023-06-01" \
+      -H "Content-Type: application/json" \
+      -d "{\"model\":\"$PROVIDER_VERIFY_MODEL\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}" \
+      "$PROVIDER_VERIFY_URL" 2>/dev/null)
+  else
+    KEY_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
+      -H "Authorization: Bearer $PROVIDER_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"model\":\"$PROVIDER_VERIFY_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" \
+      "$PROVIDER_VERIFY_URL" 2>/dev/null)
+  fi
 
-  if [ "$DS_CHECK" = "200" ]; then
-    ok "$L_ds_works"
+  if [ "$KEY_CHECK" = "200" ]; then
+    ok "${PROVIDER_LABEL} API key works!"
     echo ""
     echo -e "  ${GREEN}${BOLD}  🍃 $L_ai_activated${NC}"
     echo -e "  ${DIM}  $L_ai_guide${NC}"
@@ -236,13 +318,20 @@ collect_info() {
     echo ""
 
     # Launch AI-guided setup
-    export MAVKA_DS_KEY="$DEEPSEEK_KEY"
+    export MAVKA_AI_KEY="$PROVIDER_KEY"
+    export MAVKA_AI_PROVIDER="$PROVIDER_NAME"
+    export MAVKA_AI_VERIFY_URL="$PROVIDER_VERIFY_URL"
+    export MAVKA_AI_MODEL="$PROVIDER_VERIFY_MODEL"
     export MAVKA_LANG="$BOT_LANG"
-    export MAVKA_STEP_OFFSET=2  # bash already covered language + deepseek
+    export MAVKA_STEP_OFFSET=3  # language + provider + key
     export MAVKA_TOTAL_STEPS=$TOTAL_STEPS
+    # legacy alias for compatibility within ai_guided_setup
+    export MAVKA_DS_KEY="$PROVIDER_KEY"
+    DEEPSEEK_KEY="$PROVIDER_KEY"
     ai_guided_setup
   else
-    warn "Could not verify API key (HTTP $DS_CHECK). Continuing with manual setup..."
+    warn "Could not verify API key (HTTP $KEY_CHECK). Continuing with manual setup..."
+    DEEPSEEK_KEY="$PROVIDER_KEY"
     manual_collect_remaining
   fi
 }
@@ -255,7 +344,10 @@ ai_guided_setup() {
   cat > "$AI_SCRIPT" << 'AIEOF'
 import json, sys, os, re, subprocess, textwrap
 
-DEEPSEEK_KEY = os.environ.get("MAVKA_DS_KEY", "")
+AI_KEY = os.environ.get("MAVKA_AI_KEY", os.environ.get("MAVKA_DS_KEY", ""))
+AI_PROVIDER = os.environ.get("MAVKA_AI_PROVIDER", "deepseek")
+AI_URL = os.environ.get("MAVKA_AI_VERIFY_URL", "https://api.deepseek.com/chat/completions")
+AI_MODEL = os.environ.get("MAVKA_AI_MODEL", "deepseek-chat")
 BOT_LANG = os.environ.get("MAVKA_LANG", "en")
 STEP_OFFSET = int(os.environ.get("MAVKA_STEP_OFFSET", "0"))
 TOTAL_STEPS = int(os.environ.get("MAVKA_TOTAL_STEPS", "7"))
@@ -343,8 +435,15 @@ def step_done():
     print(f"\n  {DIM}─────────────────────────────────────────────────{NC}")
 
 def call_deepseek(messages, retries=3):
+    """Call the chosen AI provider for the conversational setup. Name kept for compatibility."""
+    if AI_PROVIDER == "anthropic":
+        return _call_anthropic(messages, retries)
+    return _call_openai_compatible(messages, retries)
+
+def _call_openai_compatible(messages, retries):
+    """OpenAI-compatible chat completions: works for DeepSeek, OpenAI, Groq."""
     payload = json.dumps({
-        "model": "deepseek-chat",
+        "model": AI_MODEL,
         "messages": messages,
         "max_tokens": 400,
         "temperature": 0.5
@@ -352,14 +451,51 @@ def call_deepseek(messages, retries=3):
     for attempt in range(retries):
         try:
             result = subprocess.run(
-                ["curl", "-s", "-X", "POST", "https://api.deepseek.com/chat/completions",
-                 "-H", f"Authorization: Bearer {DEEPSEEK_KEY}",
+                ["curl", "-s", "-X", "POST", AI_URL,
+                 "-H", f"Authorization: Bearer {AI_KEY}",
                  "-H", "Content-Type: application/json",
                  "-d", payload],
                 capture_output=True, text=True, timeout=30
             )
             data = json.loads(result.stdout)
             return data["choices"][0]["message"]["content"]
+        except Exception:
+            if attempt < retries - 1:
+                import time; time.sleep(2)
+    return None
+
+def _call_anthropic(messages, retries):
+    """Anthropic /v1/messages format — system prompt is separate, no `developer` role."""
+    sys_msg = ""
+    convo = []
+    for m in messages:
+        if m["role"] == "system":
+            sys_msg = m["content"]
+        elif m["role"] in ("user", "assistant"):
+            convo.append({"role": m["role"], "content": m["content"]})
+    payload_obj = {
+        "model": AI_MODEL,
+        "max_tokens": 400,
+        "messages": convo,
+    }
+    if sys_msg:
+        payload_obj["system"] = sys_msg
+    payload = json.dumps(payload_obj)
+    for attempt in range(retries):
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "-X", "POST", AI_URL,
+                 "-H", f"x-api-key: {AI_KEY}",
+                 "-H", "anthropic-version: 2023-06-01",
+                 "-H", "Content-Type: application/json",
+                 "-d", payload],
+                capture_output=True, text=True, timeout=30
+            )
+            data = json.loads(result.stdout)
+            # Anthropic returns content as a list of blocks
+            blocks = data.get("content", [])
+            text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+            return text or None
         except Exception:
             if attempt < retries - 1:
                 import time; time.sleep(2)
@@ -870,7 +1006,7 @@ for f in "\$HOME/mavka-bot/memory/"*.md; do
   echo "" >> "\$PROMPT_FILE"
 done
 
-exec pi --provider deepseek --model deepseek-v4-flash:off \\
+exec pi --provider ${PROVIDER_PI_NAME} --model ${PROVIDER_RUN_MODEL} \\
    --append-system-prompt "\$PROMPT_FILE"
 STARTEOF
   chmod +x "$MAVKA_HOME/start.sh"
@@ -1047,16 +1183,23 @@ TGJSON
 }
 PIJSON
 
-  # Build auth.json with all provided keys
+  # Build auth.json with all provided keys.
+  # The chosen LLM provider goes under its own Pi Agent provider name.
+  # Groq + Gemini for tools (whisper / vision) go in regardless of LLM choice.
   python3 -c "
 import json
 auth = {}
-dk = '${DEEPSEEK_KEY}'
-gk = '${GROQ_KEY}'
-gmk = '${GEMINI_KEY}'
-if dk: auth['deepseek'] = {'type': 'api_key', 'key': dk}
-if gk: auth['groq'] = {'type': 'api_key', 'key': gk}
-if gmk: auth['google'] = {'type': 'api_key', 'key': gmk}
+ai_key   = '${PROVIDER_KEY:-$DEEPSEEK_KEY}'
+ai_prov  = '${PROVIDER_PI_NAME:-deepseek}'
+groq_key = '${GROQ_KEY}'
+gem_key  = '${GEMINI_KEY}'
+if ai_key:   auth[ai_prov] = {'type': 'api_key', 'key': ai_key}
+# Groq is also used as a tool (Whisper); only add as separate entry if it's not the LLM provider
+if groq_key and ai_prov != 'groq': auth['groq'] = {'type': 'api_key', 'key': groq_key}
+elif groq_key and ai_prov == 'groq' and groq_key != ai_key:
+    # User entered a different Groq key for voice — keep one canonical entry
+    pass
+if gem_key:  auth['google'] = {'type': 'api_key', 'key': gem_key}
 with open('$HOME/.pi/agent/auth.json', 'w') as f:
     json.dump(auth, f, indent=2)
 "

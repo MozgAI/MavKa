@@ -83,12 +83,16 @@ bash install.sh
 ### What the installer asks for
 
 **Required:**
-- **DeepSeek API Key** → [platform.deepseek.com](https://platform.deepseek.com/api_keys) (top up $2)
+- **AI Provider** — pick one of:
+  - **DeepSeek** → [platform.deepseek.com](https://platform.deepseek.com) — cheapest, ~$2/mo (recommended)
+  - **OpenAI** → [platform.openai.com](https://platform.openai.com) — GPT-4o-mini, mainstream
+  - **Anthropic** → [console.anthropic.com](https://console.anthropic.com) — Claude Haiku 4.5
+  - **Groq** → [console.groq.com](https://console.groq.com) — Llama 3.3 70B, free tier with limits
 - **Telegram Bot Token** → [@BotFather](https://t.me/BotFather) (free)
 - **Your Telegram User ID** → [@userinfobot](https://t.me/userinfobot) (free)
 
 **Optional (skip to enable later):**
-- **Groq Key** → voice transcription, free 8h/day
+- **Groq Key** → voice transcription via Whisper, free 8h/day
 - **Gemini Key** → photo analysis, free tier
 - **Tavily Key** → web search, free 1000/mo
 
@@ -108,8 +112,8 @@ Let's be honest. MavKa is "self-hosted" but the AI itself runs in the cloud. Her
 
 | Data | Goes to |
 |---|---|
-| Text messages | DeepSeek API |
-| Voice notes | Groq API (transcribed, then text → DeepSeek) |
+| Text messages | Your chosen AI provider (DeepSeek / OpenAI / Anthropic / Groq) |
+| Voice notes | Groq API (transcribed via Whisper, then text → your AI) |
 | Photos | Google AI Studio (Gemini) |
 | Web search queries | Tavily API |
 | Telegram messages | Telegram Bot API |
@@ -126,16 +130,24 @@ See [SECURITY.md](SECURITY.md) for full details on data flow, key storage, and d
 
 ## The Real Cost
 
+Depends on which provider you pick:
+
+| Provider | Casual chat | Heavy coding |
+|---|---|---|
+| **DeepSeek** V4 Flash | ~$2/mo | ~$30/mo |
+| **OpenAI** GPT-4o-mini | ~$5/mo | ~$60/mo |
+| **Anthropic** Haiku 4.5 | ~$5-10/mo | ~$80/mo |
+| **Groq** Llama 3.3 70B | $0 (free tier) | hits daily limits |
+
+Tools layered on top:
+
 | Service | Pricing |
 |---|---|
-| DeepSeek V4 Flash (248B) | $0.14 per 1M tokens |
-| Groq Whisper | Free (8h/day) |
-| Gemini Vision | Free tier |
+| Groq Whisper (voice) | Free (8h/day) |
+| Gemini Vision (photos) | Free tier |
 | Tavily Search | Free tier (1000/mo) |
-| **Casual daily chat** | **~$2/month** |
-| **Heavy coding use** | **~$30/month** |
 
-Numbers are real measurements, not marketing. Your usage may differ — check your DeepSeek dashboard.
+Numbers are estimates from real measurements with DeepSeek. Your usage may differ — check your provider's dashboard.
 
 ## How It Works
 
@@ -146,10 +158,10 @@ Telegram Bot API
     ↓
 Pi Agent (your machine)  ←  pi-telegram extension
     ↓
-DeepSeek API (cloud)     ←  Groq, Gemini, Tavily for tools
+Your AI provider (cloud) ←  Groq, Gemini, Tavily for tools
 ```
 
-Your computer runs a lightweight Node.js process. The heavy thinking happens in the cloud. Your data, memory, and config stay local. The AI brain is rented per token.
+Pick your brain at install time: **DeepSeek**, **OpenAI**, **Anthropic**, or **Groq**. Your computer runs a lightweight Node.js process. The heavy thinking happens in the cloud. Your data, memory, and config stay local. The AI brain is rented per token — and you can switch providers anytime by re-running the installer.
 
 ## Platforms
 
