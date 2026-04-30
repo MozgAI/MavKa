@@ -382,7 +382,9 @@ MavKa is the fix. **One command. Five minutes. Done.** And while I was at it, I 
 
 ## Status
 
-Early days. Tested on macOS (Apple Silicon) and Arch Linux. Use at your own risk, file issues, send PRs.
+Early days. Tested on macOS (Apple Silicon) and Arch Linux. Windows is in beta.
+
+If something breaks — [open an issue on GitHub](https://github.com/MozgAI/MavKa/issues). If you can fix it — send a Pull Request. Everyone welcome.
 
 ## License
 
