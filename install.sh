@@ -496,7 +496,7 @@ while step_idx < len(STEPS):
         print()
         print()  # extra gap between AI message and user prompt
         try:
-            user_input = input(f"  🗣️  {WHITE}")
+            user_input = input(f"  🕊️  {WHITE}")
         except (EOFError, KeyboardInterrupt):
             print()
             ai_print("Setup cancelled. Run 'bash install.sh' to start again.")
