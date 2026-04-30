@@ -820,11 +820,57 @@ You communicate via Telegram. The user is your owner.
 
 ## Tools available
 - Web search (Tavily)
-- Voice transcription (Groq Whisper)
+- Voice transcription
+- Voice → English translation ("British" mode — see below)
 - Photo analysis (Gemini Vision)
 - Text-to-speech (tts.cmd)
 - File system access on the user's machine
-- Memory recall: `bash recall.sh "query"` (search wiki + history + summaries)
+- Memory recall: `recall.cmd "query"` (search wiki + history + summaries)
+- Hot-swap API key: `setkey.cmd <provider> <new_key>` (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
+
+## Formatting — Telegram sends with parse_mode=HTML
+
+CRITICAL: replies are sent to Telegram with parse_mode=HTML. Use HTML tags, NOT Markdown.
+
+DO use:
+- <b>bold</b> for emphasis
+- <i>italic</i> for soft emphasis
+- <code>inline code</code> for short code / file paths / commands
+- <pre>multi-line code</pre> for tables and code blocks
+- <a href="URL">link text</a> for links
+
+DO NOT use:
+- **double asterisks** — will appear as literal asterisks
+- *single asterisks* — same problem
+- _underscores_ for italic — won't render
+- # # # headers — Telegram has no header tag, use <b>...</b> instead
+- triple backticks — use <pre>...</pre> instead
+
+## Tables — when you need columns
+
+Wrap padded ASCII rows inside <pre>...</pre>. ASCII characters only (+, -, |). Pad columns to fixed widths. Total width ≤ 32 chars for iPhone portrait. Keep tables ≤ 5 rows.
+
+For 2-3 columns, prefer a bullet list with <b>bold</b> labels — reads faster on a phone.
+
+## "British" mode — voice → English translation
+
+When the user says "Британец", "позови Британця", "включи британца" or similar — switch into British mode:
+1. Create marker: `New-Item "$env:USERPROFILE\mavka-bot\.british_mode" -Force`
+2. Reply: "Диктуй, переведу"
+3. From now on, run `whisper.cmd <audio> --british` for voice messages instead of normal.
+4. Reply with ONLY the translated text inside a <pre>...</pre> block. No prefixes, no flags, no commentary.
+
+When the user says "вимкни Британця" / "хватит" — `Remove-Item "$env:USERPROFILE\mavka-bot\.british_mode"` and confirm in one short sentence.
+
+## Hot-swap API key
+
+If the user says "поменяй ключ на ...", "вот новый ключ для DeepSeek: sk-...", "хочу переподключить openai":
+1. Identify the provider name (deepseek / openai / anthropic / moonshotai / groq / google / tavily).
+2. Run `setkey.cmd <provider> <new_key>`.
+3. The script updates auth.json and restarts MavKa automatically.
+4. Confirm: "Ключ обновлён, бот перезапущен."
+
+NEVER tell the user to re-run install.ps1 just to change a key.
 
 ## Memory System — LLM Wiki Protocol
 
@@ -1048,6 +1094,80 @@ if "%TEXT%"=="" (
 edge-tts --voice "en-US-AriaNeural" --text "%TEXT%" --write-media "%OUTPUT%" 2>nul && echo %OUTPUT%
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'tts.cmd') -Value $ttsCmd -Encoding ASCII
+
+    # whisper.cmd — Groq Whisper transcription + British mode (translation to English)
+    # Usage:
+    #   whisper.cmd <audio>              transcribe in native language
+    #   whisper.cmd <audio> --british    translate any language to English
+    $whisperCmd = @"
+@echo off
+setlocal
+set AUDIO=%~1
+set MODE=%~2
+if "%AUDIO%"=="" (
+    echo Usage: whisper.cmd ^<audio^> [--british]
+    exit /b 1
+)
+if not exist "%AUDIO%" (
+    echo Error: file not found: %AUDIO%
+    exit /b 1
+)
+if "%GROQ_API_KEY%"=="" (
+    echo Error: GROQ_API_KEY not set
+    exit /b 1
+)
+if /i "%MODE%"=="--british" (
+    curl -s -X POST "https://api.groq.com/openai/v1/audio/translations" ^
+      -H "Authorization: Bearer %GROQ_API_KEY%" ^
+      -F "file=@%AUDIO%" -F "model=whisper-large-v3" -F "response_format=text"
+) else (
+    curl -s -X POST "https://api.groq.com/openai/v1/audio/transcriptions" ^
+      -H "Authorization: Bearer %GROQ_API_KEY%" ^
+      -F "file=@%AUDIO%" -F "model=whisper-large-v3" -F "response_format=text"
+)
+"@
+    Set-Content -Path (Join-Path $script:MAVKA_HOME 'whisper.cmd') -Value $whisperCmd -Encoding ASCII
+
+    # setkey.cmd — hot-swap API key without re-running installer
+    $setkeyCmd = @"
+@echo off
+setlocal
+set PROV=%~1
+set NEWKEY=%~2
+if "%PROV%"=="" goto usage
+if "%NEWKEY%"=="" goto usage
+
+set AUTH=%USERPROFILE%\.pi\agent\auth.json
+if not exist "%AUTH%" (
+    echo Error: %AUTH% not found
+    exit /b 1
+)
+
+if /i "%PROV%"=="tavily" (
+    powershell -NoProfile -Command "[Environment]::SetEnvironmentVariable('TAVILY_API_KEY','%NEWKEY%','User')"
+    echo + tavily key updated in user environment
+    goto restart
+)
+
+powershell -NoProfile -Command ^
+  "$j = Get-Content '%AUTH%' -Raw | ConvertFrom-Json -AsHashtable; $j['%PROV%'] = @{type='api_key';key='%NEWKEY%'}; $j | ConvertTo-Json -Depth 5 | Set-Content '%AUTH%' -Encoding UTF8"
+echo + %PROV% key updated in auth.json
+
+:restart
+echo Restarting MavKa...
+schtasks /End /TN "MavKa" >nul 2>&1
+taskkill /IM pi.exe /F >nul 2>&1
+timeout /t 2 /nobreak >nul
+schtasks /Run /TN "MavKa" >nul 2>&1
+echo + MavKa restarted. New key is live.
+exit /b 0
+
+:usage
+echo Usage: setkey.cmd ^<provider^> ^<new_key^>
+echo Providers: deepseek, openai, anthropic, moonshotai, groq, google, tavily
+exit /b 1
+"@
+    Set-Content -Path (Join-Path $script:MAVKA_HOME 'setkey.cmd') -Value $setkeyCmd -Encoding ASCII
 
     ok "MavKa home created at $($script:MAVKA_HOME)"
 }
