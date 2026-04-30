@@ -2,6 +2,15 @@
   <img src="social-preview.png" alt="MavKa" width="640">
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/MozgAI/MavKa?color=50fa7b" alt="MIT License"></a>
+  <a href="https://github.com/MozgAI/MavKa/stargazers"><img src="https://img.shields.io/github/stars/MozgAI/MavKa?color=8be9fd" alt="Stars"></a>
+  <img src="https://img.shields.io/badge/macOS-Apple_Silicon%20%7C%20Intel-c0c0d0" alt="macOS">
+  <img src="https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Arch%20%7C%20Debian-c0c0d0" alt="Linux">
+  <img src="https://img.shields.io/badge/install-5_min-50fa7b" alt="Install time">
+  <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
+</p>
+
 <h3 align="center">Your own AI. In Telegram. On your machine. For almost nothing.</h3>
 
 <p align="center">
@@ -62,21 +71,13 @@ One install. Two superpowers. **$2/month.**
 
 ## Install
 
-### Safe install (recommended)
-
-Read the script first. Run it second.
+The one-liner is at the top of this README. If you'd rather **read the script before running it** (recommended for any `curl | bash`):
 
 ```bash
 git clone https://github.com/MozgAI/mavka.git
 cd mavka
-less install.sh        # read what it does
+less install.sh
 bash install.sh
-```
-
-### One-liner (for the brave)
-
-```bash
-bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 ```
 
 ### What the installer asks for
@@ -174,7 +175,7 @@ MavKa is the fix. One command. Five minutes. Done.
 
 ## Status
 
-Early days. **Two days old**, two contributors, tested on macOS and Arch Linux. Use at your own risk, file issues, send PRs.
+Early days. Tested on macOS (Apple Silicon) and Arch Linux. Use at your own risk, file issues, send PRs.
 
 ## License
 
