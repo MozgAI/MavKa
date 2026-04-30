@@ -128,12 +128,9 @@ collect_info() {
   echo -e "${GREEN}${BOLD}  $L_step1${NC}"
   echo ""
   echo -e "  ${DIM}$L_pick_lang${NC}"
-  echo -e "  ${DIM}  1) 🇬🇧 English${NC}"
-  echo -e "  ${DIM}  2) 🇺🇦 Українська${NC}"
-  echo -e "  ${DIM}  3) 🇷🇺 Русский${NC}"
-  echo -e "  ${DIM}  4) 🇩🇪 Deutsch${NC}"
-  echo -e "  ${DIM}  5) 🇫🇷 Français${NC}"
-  echo -e "  ${DIM}  6) 🇪🇸 Español${NC}"
+  echo ""
+  echo -e "  ${DIM}🇬🇧 ${WHITE}1${DIM} English      🇺🇦 ${WHITE}2${DIM} Українська    🇷🇺 ${WHITE}3${DIM} Русский${NC}"
+  echo -e "  ${DIM}🇩🇪 ${WHITE}4${DIM} Deutsch      🇫🇷 ${WHITE}5${DIM} Français      🇪🇸 ${WHITE}6${DIM} Español${NC}"
   echo ""
 
   read -p "  Choice [1]: " LANG_CHOICE
