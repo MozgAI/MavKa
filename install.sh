@@ -60,96 +60,64 @@ show_header() {
 }
 
 # ─── i18n ─────────────────────────────────────────────────────
-declare -A L
-
 set_lang() {
   case "$1" in
     uk)
-      L[step1]="Крок 1: Мова"
-      L[step2]="Крок 2: API ключі"
-      L[step3]="Крок 3: Telegram бот"
-      L[step4]="Крок 4: Особистість"
-      L[pick_lang]="Оберіть мову бота:"
-      L[get_keys]="Отримайте ключі (всі безкоштовні або майже):"
-      L[deepseek_key]="DeepSeek API Key: "
-      L[groq_key]="Groq API Key (голос): "
-      L[gemini_key]="Gemini API Key (фото): "
-      L[tavily_key]="Tavily API Key (пошук): "
-      L[optional]="(необов'язково — пропустіть для відключення)"
-      L[required]="обов'язкове поле"
-      L[create_bot]="Створіть бота: t.me/BotFather → /newbot"
-      L[tg_token]="Telegram Bot Token: "
-      L[tg_id]="Ваш Telegram User ID: "
-      L[bot_name]="Ім'я бота [MavKa]: "
-      L[choose_persona]="Оберіть особистість або опишіть свою:"
-      L[p1]="🧠 Розумний асистент (за замовчуванням)"
-      L[p2]="🥗 Дієтолог та фітнес-тренер"
-      L[p3]="👨‍🍳 Кухар та підбір рецептів"
-      L[p4]="📚 Мовний репетитор"
-      L[p5]="Свій варіант (опишіть)"
-      L[describe]="Опишіть особистість бота: "
-      L[ready]="Готово до встановлення!"
-      L[press_enter]="Натисніть Enter для продовження (або Ctrl+C для скасування)..."
-      L[is_ready]="MavKa готова!"
-      L[say_hi]="Відкрийте Telegram і напишіть привіт! 👋"
+      L_step1="Крок 1: Мова";         L_step2="Крок 2: API ключі"
+      L_step3="Крок 3: Telegram бот";  L_step4="Крок 4: Особистість"
+      L_pick_lang="Оберіть мову бота:"
+      L_get_keys="Отримайте ключі (всі безкоштовні або майже):"
+      L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
+      L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (пошук): "
+      L_optional="(необов'язково — пропустіть для відключення)"; L_required="обов'язкове поле"
+      L_create_bot="Створіть бота: t.me/BotFather → /newbot"
+      L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
+      L_bot_name="Ім'я бота [MavKa]: "
+      L_choose_persona="Оберіть особистість або опишіть свою:"
+      L_p1="Розумний асистент (за замовчуванням)"; L_p2="Дієтолог та фітнес-тренер"
+      L_p3="Кухар та підбір рецептів"; L_p4="Мовний репетитор"
+      L_p5="Свій варіант (опишіть)"; L_describe="Опишіть особистість бота: "
+      L_ready="Готово до встановлення!"
+      L_press_enter="Натисніть Enter для продовження (або Ctrl+C для скасування)..."
+      L_is_ready="MavKa готова!"; L_say_hi="Відкрийте Telegram і напишіть привіт!"
       ;;
     ru)
-      L[step1]="Шаг 1: Язык"
-      L[step2]="Шаг 2: API ключи"
-      L[step3]="Шаг 3: Telegram бот"
-      L[step4]="Шаг 4: Личность"
-      L[pick_lang]="Выберите язык бота:"
-      L[get_keys]="Получите ключи (все бесплатные или почти):"
-      L[deepseek_key]="DeepSeek API Key: "
-      L[groq_key]="Groq API Key (голос): "
-      L[gemini_key]="Gemini API Key (фото): "
-      L[tavily_key]="Tavily API Key (поиск): "
-      L[optional]="(необязательно — пропустите для отключения)"
-      L[required]="обязательное поле"
-      L[create_bot]="Создайте бота: t.me/BotFather → /newbot"
-      L[tg_token]="Telegram Bot Token: "
-      L[tg_id]="Ваш Telegram User ID: "
-      L[bot_name]="Имя бота [MavKa]: "
-      L[choose_persona]="Выберите личность или опишите свою:"
-      L[p1]="🧠 Умный ассистент (по умолчанию)"
-      L[p2]="🥗 Диетолог и фитнес-тренер"
-      L[p3]="👨‍🍳 Повар и подбор рецептов"
-      L[p4]="📚 Языковой репетитор"
-      L[p5]="Свой вариант (опишите)"
-      L[describe]="Опишите личность бота: "
-      L[ready]="Готово к установке!"
-      L[press_enter]="Нажмите Enter для продолжения (или Ctrl+C для отмены)..."
-      L[is_ready]="MavKa готова!"
-      L[say_hi]="Откройте Telegram и напишите привет! 👋"
+      L_step1="Шаг 1: Язык";          L_step2="Шаг 2: API ключи"
+      L_step3="Шаг 3: Telegram бот";   L_step4="Шаг 4: Личность"
+      L_pick_lang="Выберите язык бота:"
+      L_get_keys="Получите ключи (все бесплатные или почти):"
+      L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
+      L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (поиск): "
+      L_optional="(необязательно — пропустите для отключения)"; L_required="обязательное поле"
+      L_create_bot="Создайте бота: t.me/BotFather → /newbot"
+      L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
+      L_bot_name="Имя бота [MavKa]: "
+      L_choose_persona="Выберите личность или опишите свою:"
+      L_p1="Умный ассистент (по умолчанию)"; L_p2="Диетолог и фитнес-тренер"
+      L_p3="Повар и подбор рецептов"; L_p4="Языковой репетитор"
+      L_p5="Свой вариант (опишите)"; L_describe="Опишите личность бота: "
+      L_ready="Готово к установке!"
+      L_press_enter="Нажмите Enter для продолжения (или Ctrl+C для отмены)..."
+      L_is_ready="MavKa готова!"; L_say_hi="Откройте Telegram и напишите привет!"
       ;;
     *)
-      L[step1]="Step 1: Language"
-      L[step2]="Step 2: API Keys"
-      L[step3]="Step 3: Telegram Bot"
-      L[step4]="Step 4: Personality"
-      L[pick_lang]="Choose your bot's language:"
-      L[get_keys]="Get your keys (all free or nearly free):"
-      L[deepseek_key]="DeepSeek API Key: "
-      L[groq_key]="Groq API Key (voice): "
-      L[gemini_key]="Gemini API Key (photos): "
-      L[tavily_key]="Tavily API Key (web search): "
-      L[optional]="(optional — skip to disable)"
-      L[required]="required"
-      L[create_bot]="Create a bot: t.me/BotFather → /newbot"
-      L[tg_token]="Telegram Bot Token: "
-      L[tg_id]="Your Telegram User ID: "
-      L[bot_name]="Bot name [MavKa]: "
-      L[choose_persona]="Choose a personality or write your own:"
-      L[p1]="🧠 Smart assistant (default)"
-      L[p2]="🥗 Nutritionist & fitness coach"
-      L[p3]="👨‍🍳 Chef & recipe finder"
-      L[p4]="📚 Language tutor"
-      L[p5]="Custom (you describe it)"
-      L[describe]="Describe your bot's personality: "
-      L[ready]="Ready to install!"
-      L[press_enter]="Press Enter to continue (or Ctrl+C to cancel)..."
-      L[is_ready]="MavKa is ready!"
-      L[say_hi]="Open Telegram and say hi! 👋"
+      L_step1="Step 1: Language";      L_step2="Step 2: API Keys"
+      L_step3="Step 3: Telegram Bot";  L_step4="Step 4: Personality"
+      L_pick_lang="Choose your bot's language:"
+      L_get_keys="Get your keys (all free or nearly free):"
+      L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (voice): "
+      L_gemini_key="Gemini API Key (photos): "; L_tavily_key="Tavily API Key (web search): "
+      L_optional="(optional — skip to disable)"; L_required="required"
+      L_create_bot="Create a bot: t.me/BotFather → /newbot"
+      L_tg_token="Telegram Bot Token: "; L_tg_id="Your Telegram User ID: "
+      L_bot_name="Bot name [MavKa]: "
+      L_choose_persona="Choose a personality or write your own:"
+      L_p1="Smart assistant (default)"; L_p2="Nutritionist & fitness coach"
+      L_p3="Chef & recipe finder"; L_p4="Language tutor"
+      L_p5="Custom (you describe it)"; L_describe="Describe your bot's personality: "
+      L_ready="Ready to install!"
+      L_press_enter="Press Enter to continue (or Ctrl+C to cancel)..."
+      L_is_ready="MavKa is ready!"; L_say_hi="Open Telegram and say hi!"
       ;;
   esac
 }
@@ -157,9 +125,9 @@ set_lang() {
 # ─── Collect Info ─────────────────────────────────────────────
 collect_info() {
   # Language FIRST
-  echo -e "${GREEN}${BOLD}  ${L[step1]}${NC}"
+  echo -e "${GREEN}${BOLD}  $L_step1${NC}"
   echo ""
-  echo -e "  ${DIM}${L[pick_lang]}${NC}"
+  echo -e "  ${DIM}$L_pick_lang${NC}"
   echo -e "  ${DIM}  1) 🇬🇧 English${NC}"
   echo -e "  ${DIM}  2) 🇺🇦 Українська${NC}"
   echo -e "  ${DIM}  3) 🇷🇺 Русский${NC}"
@@ -182,15 +150,15 @@ collect_info() {
   set_lang "$BOT_LANG"
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ${L[step2]}${NC}"
+  echo -e "${GREEN}${BOLD}  $L_step2${NC}"
   echo -e "  ${DIM}DeepSeek API Key — the brain of your bot${NC}"
   echo -e "  ${DIM}  Get it free: platform.deepseek.com/api_keys${NC}"
   echo ""
 
   while true; do
-    read -p "  ${L[deepseek_key]}" DEEPSEEK_KEY
+    read -p "  $L_deepseek_key" DEEPSEEK_KEY
     [ -n "$DEEPSEEK_KEY" ] && break
-    echo -e "  ${RED}⚠ DeepSeek API Key — ${L[required]}${NC}"
+    echo -e "  ${RED}⚠ DeepSeek API Key — $L_required${NC}"
     echo -e "  ${DIM}  Sign up free at platform.deepseek.com, go to API Keys, create one.${NC}"
   done
 
@@ -504,48 +472,48 @@ AIEOF
 
 # ─── Manual Fallback (if DeepSeek key fails) ─────────────────
 manual_collect_remaining() {
-  read -p "  ${L[groq_key]}" GROQ_KEY
-  echo -e "  ${DIM}${L[optional]}${NC}"
+  read -p "  $L_groq_key" GROQ_KEY
+  echo -e "  ${DIM}$L_optional${NC}"
 
-  read -p "  ${L[gemini_key]}" GEMINI_KEY
-  echo -e "  ${DIM}${L[optional]}${NC}"
+  read -p "  $L_gemini_key" GEMINI_KEY
+  echo -e "  ${DIM}$L_optional${NC}"
 
-  read -p "  ${L[tavily_key]}" TAVILY_KEY
-  echo -e "  ${DIM}${L[optional]}${NC}"
+  read -p "  $L_tavily_key" TAVILY_KEY
+  echo -e "  ${DIM}$L_optional${NC}"
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ${L[step3]}${NC}"
-  echo -e "  ${DIM}${L[create_bot]}${NC}"
+  echo -e "${GREEN}${BOLD}  $L_step3${NC}"
+  echo -e "  ${DIM}$L_create_bot${NC}"
   echo ""
 
   while true; do
-    read -p "  ${L[tg_token]}" TG_TOKEN
+    read -p "  $L_tg_token" TG_TOKEN
     [ -n "$TG_TOKEN" ] && break
-    echo -e "  ${RED}⚠ Telegram Bot Token — ${L[required]}${NC}"
+    echo -e "  ${RED}⚠ Telegram Bot Token — $L_required${NC}"
     echo -e "  ${DIM}  Create one: t.me/BotFather → /newbot${NC}"
   done
 
   while true; do
-    read -p "  ${L[tg_id]}" TG_USER_ID
+    read -p "  $L_tg_id" TG_USER_ID
     [ -n "$TG_USER_ID" ] && break
-    echo -e "  ${RED}⚠ Telegram User ID — ${L[required]}${NC}"
+    echo -e "  ${RED}⚠ Telegram User ID — $L_required${NC}"
     echo -e "  ${DIM}  Get it: t.me/userinfobot${NC}"
   done
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ${L[step4]}${NC}"
+  echo -e "${GREEN}${BOLD}  $L_step4${NC}"
   echo ""
 
-  read -p "  ${L[bot_name]}" BOT_NAME
+  read -p "  $L_bot_name" BOT_NAME
   BOT_NAME="${BOT_NAME:-MavKa}"
 
   echo ""
-  echo -e "  ${DIM}${L[choose_persona]}${NC}"
-  echo -e "  ${DIM}  1) ${L[p1]}${NC}"
-  echo -e "  ${DIM}  2) ${L[p2]}${NC}"
-  echo -e "  ${DIM}  3) ${L[p3]}${NC}"
-  echo -e "  ${DIM}  4) ${L[p4]}${NC}"
-  echo -e "  ${DIM}  5) ${L[p5]}${NC}"
+  echo -e "  ${DIM}$L_choose_persona${NC}"
+  echo -e "  ${DIM}  1) $L_p1${NC}"
+  echo -e "  ${DIM}  2) $L_p2${NC}"
+  echo -e "  ${DIM}  3) $L_p3${NC}"
+  echo -e "  ${DIM}  4) $L_p4${NC}"
+  echo -e "  ${DIM}  5) $L_p5${NC}"
   echo ""
 
   read -p "  Choice [1]: " PERSONA_CHOICE
@@ -556,16 +524,16 @@ manual_collect_remaining() {
     2) PERSONA="an expert nutritionist and fitness coach. You analyze meals (including from photos), count calories, create meal plans and workout routines. You are motivating, supportive, and science-based." ;;
     3) PERSONA="a professional chef and recipe expert. You suggest recipes based on available ingredients, dietary restrictions, and preferences. You explain techniques clearly and make cooking fun." ;;
     4) PERSONA="a patient and encouraging language tutor. You help learn new languages through conversation, correct mistakes gently, explain grammar, and adapt to the learner's level." ;;
-    5) read -p "  ${L[describe]}" PERSONA
+    5) read -p "  $L_describe" PERSONA
        [ -z "$PERSONA" ] && PERSONA="a smart, proactive, and friendly AI assistant." ;;
     *) PERSONA="a smart, proactive, and friendly AI assistant." ;;
   esac
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ${L[ready]}${NC}"
+  echo -e "${GREEN}${BOLD}  $L_ready${NC}"
   echo -e "  ${DIM}Bot: ${BOT_NAME} | Lang: ${BOT_LANG} | Platform: ${OS}${NC}"
   echo ""
-  read -p "  ${L[press_enter]}"
+  read -p "  $L_press_enter"
 }
 
 # ─── Install Dependencies ────────────────────────────────────
@@ -1154,8 +1122,8 @@ show_done() {
   echo '   ██║ ╚═╝ ██║██║  ██║ ╚████╔╝ ██║  ██╗██║  ██║'
   echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝ ╚═╝  ╚═╝╚═╝  ╚═╝'
   echo -e "${NC}"
-  echo -e "          ${GREEN}🍃 ${L[is_ready]}${NC}"
-  echo -e "          ${WHITE}${L[say_hi]}${NC}"
+  echo -e "          ${GREEN}🍃 $L_is_ready${NC}"
+  echo -e "          ${WHITE}$L_say_hi${NC}"
   echo ""
   echo -e "  ${DIM}──────────────────────────────────────────${NC}"
   echo ""
