@@ -44,12 +44,12 @@ show_header() {
   clear
   echo ""
   echo -e "${GREEN}"
-  echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗'
+  echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗ '
   echo '   ████╗ ████║██╔══██╗██║   ██║██║ ██╔╝██╔══██╗'
   echo '   ██╔████╔██║███████║██║   ██║█████╔╝ ███████║'
   echo '   ██║╚██╔╝██║██╔══██║╚██╗ ██╔╝██╔═██╗ ██╔══██║'
   echo '   ██║ ╚═╝ ██║██║  ██║ ╚████╔╝ ██║  ██╗██║  ██║'
-  echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝ ╚═╝  ╚═╝╚═╝  ╚═╝'
+  echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═╝'
   echo -e "${NC}"
   echo -e "          ${PURPLE}forest ai 🍃 alive 🍃 listening${NC}"
   echo ""
@@ -69,6 +69,15 @@ set_lang() {
       L_get_keys="Отримайте ключі (всі безкоштовні або майже):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (пошук): "
+      L_ds_brain="DeepSeek API Key — мозок твого бота"
+      L_ds_getfree="Отримай безкоштовно: platform.deepseek.com/api_keys"
+      L_ds_signup="Зареєструйся на platform.deepseek.com, перейди в API Keys, створи новий."
+      L_verifying="Перевіряємо ключ..."
+      L_ds_works="DeepSeek API ключ працює!"
+      L_ai_activated="Помічник активовано!"
+      L_ai_guide="MavKa проведе тебе через решту налаштування."
+      L_ai_natural="Пиши природно — задавай питання, якщо щось незрозуміло."
+      L_ai_skip="Пиши 'пропустити' для необов'язкових кроків."
       L_optional="(необов'язково — пропустіть для відключення)"; L_required="обов'язкове поле"
       L_create_bot="Створіть бота: t.me/BotFather → /newbot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
@@ -88,6 +97,15 @@ set_lang() {
       L_get_keys="Получите ключи (все бесплатные или почти):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (голос): "
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (поиск): "
+      L_ds_brain="DeepSeek API Key — мозг твоего бота"
+      L_ds_getfree="Получи бесплатно: platform.deepseek.com/api_keys"
+      L_ds_signup="Зарегистрируйся на platform.deepseek.com, зайди в API Keys, создай ключ."
+      L_verifying="Проверяем ключ..."
+      L_ds_works="DeepSeek API ключ работает!"
+      L_ai_activated="Помощник активирован!"
+      L_ai_guide="MavKa проведёт тебя через остальные шаги."
+      L_ai_natural="Пиши естественно — задавай вопросы, если что-то неясно."
+      L_ai_skip="Пиши 'пропустить' для необязательных шагов."
       L_optional="(необязательно — пропустите для отключения)"; L_required="обязательное поле"
       L_create_bot="Создайте бота: t.me/BotFather → /newbot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Ваш Telegram User ID: "
@@ -107,6 +125,15 @@ set_lang() {
       L_get_keys="Get your keys (all free or nearly free):"
       L_deepseek_key="DeepSeek API Key: "; L_groq_key="Groq API Key (voice): "
       L_gemini_key="Gemini API Key (photos): "; L_tavily_key="Tavily API Key (web search): "
+      L_ds_brain="DeepSeek API Key — the brain of your bot"
+      L_ds_getfree="Get it free: platform.deepseek.com/api_keys"
+      L_ds_signup="Sign up free at platform.deepseek.com, go to API Keys, create one."
+      L_verifying="Verifying API key..."
+      L_ds_works="DeepSeek API key works!"
+      L_ai_activated="AI Assistant activated!"
+      L_ai_guide="MavKa will now guide you through the rest of setup."
+      L_ai_natural="Type naturally — ask questions if anything is unclear."
+      L_ai_skip="Type 'skip' to skip optional steps."
       L_optional="(optional — skip to disable)"; L_required="required"
       L_create_bot="Create a bot: t.me/BotFather → /newbot"
       L_tg_token="Telegram Bot Token: "; L_tg_id="Your Telegram User ID: "
@@ -129,8 +156,8 @@ collect_info() {
   echo ""
   echo -e "  ${DIM}$L_pick_lang${NC}"
   echo ""
-  echo -e "  ${DIM}🇬🇧 ${WHITE}1${DIM} English      🇺🇦 ${WHITE}2${DIM} Українська    🇫🇷 ${WHITE}3${DIM} Français${NC}"
-  echo -e "  ${DIM}🇩🇪 ${WHITE}4${DIM} Deutsch      🇪🇸 ${WHITE}5${DIM} Español       🇷🇺 ${WHITE}6${DIM} Русский${NC}"
+  echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇫🇷  ${WHITE}3${NC} ${DIM}Français${NC}"
+  echo -e "  🇩🇪  ${WHITE}4${NC} ${DIM}Deutsch${NC}      🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
   echo ""
 
   read -p "  Choice [1]: " LANG_CHOICE
@@ -148,19 +175,19 @@ collect_info() {
 
   echo ""
   echo -e "${GREEN}${BOLD}  $L_step2${NC}"
-  echo -e "  ${DIM}DeepSeek API Key — the brain of your bot${NC}"
-  echo -e "  ${DIM}  Get it free: platform.deepseek.com/api_keys${NC}"
+  echo -e "  ${DIM}$L_ds_brain${NC}"
+  echo -e "  ${DIM}  $L_ds_getfree${NC}"
   echo ""
 
   while true; do
     read -p "  $L_deepseek_key" DEEPSEEK_KEY
     [ -n "$DEEPSEEK_KEY" ] && break
     echo -e "  ${RED}⚠ DeepSeek API Key — $L_required${NC}"
-    echo -e "  ${DIM}  Sign up free at platform.deepseek.com, go to API Keys, create one.${NC}"
+    echo -e "  ${DIM}  $L_ds_signup${NC}"
   done
 
   # Verify DeepSeek key works
-  info "Verifying API key..."
+  info "$L_verifying"
   DS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "Authorization: Bearer $DEEPSEEK_KEY" \
     -H "Content-Type: application/json" \
@@ -168,12 +195,12 @@ collect_info() {
     "https://api.deepseek.com/chat/completions" 2>/dev/null)
 
   if [ "$DS_CHECK" = "200" ]; then
-    ok "DeepSeek API key works!"
+    ok "$L_ds_works"
     echo ""
-    echo -e "  ${GREEN}${BOLD}  🍃 AI Assistant activated!${NC}"
-    echo -e "  ${DIM}  MavKa will now guide you through the rest of setup.${NC}"
-    echo -e "  ${DIM}  Type naturally — ask questions if anything is unclear.${NC}"
-    echo -e "  ${DIM}  Type 'skip' to skip optional steps.${NC}"
+    echo -e "  ${GREEN}${BOLD}  🍃 $L_ai_activated${NC}"
+    echo -e "  ${DIM}  $L_ai_guide${NC}"
+    echo -e "  ${DIM}  $L_ai_natural${NC}"
+    echo -e "  ${DIM}  $L_ai_skip${NC}"
     echo ""
 
     # Launch AI-guided setup
@@ -1192,12 +1219,12 @@ launch_bot() {
 show_done() {
   echo ""
   echo -e "${GREEN}"
-  echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗'
+  echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗ '
   echo '   ████╗ ████║██╔══██╗██║   ██║██║ ██╔╝██╔══██╗'
   echo '   ██╔████╔██║███████║██║   ██║█████╔╝ ███████║'
   echo '   ██║╚██╔╝██║██╔══██║╚██╗ ██╔╝██╔═██╗ ██╔══██║'
   echo '   ██║ ╚═╝ ██║██║  ██║ ╚████╔╝ ██║  ██╗██║  ██║'
-  echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝ ╚═╝  ╚═╝╚═╝  ╚═╝'
+  echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═╝'
   echo -e "${NC}"
   echo -e "          ${GREEN}🍃 $L_is_ready${NC}"
   echo -e "          ${WHITE}$L_say_hi${NC}"
