@@ -87,6 +87,7 @@ bash install.sh
   - **DeepSeek** → [platform.deepseek.com](https://platform.deepseek.com) — cheapest, ~$2/mo (recommended)
   - **OpenAI** → [platform.openai.com](https://platform.openai.com) — GPT-4o-mini, mainstream
   - **Anthropic** → [console.anthropic.com](https://console.anthropic.com) — Claude Haiku 4.5
+  - **Kimi 2.6** → [platform.moonshot.ai](https://platform.moonshot.ai) — Moonshot Kimi-K2, long context
   - **Groq** → [console.groq.com](https://console.groq.com) — Llama 3.3 70B, free tier with limits
 - **Telegram Bot Token** → [@BotFather](https://t.me/BotFather) (free)
 - **Your Telegram User ID** → [@userinfobot](https://t.me/userinfobot) (free)
@@ -137,6 +138,7 @@ Depends on which provider you pick:
 | **DeepSeek** V4 Flash | ~$2/mo | ~$30/mo |
 | **OpenAI** GPT-4o-mini | ~$5/mo | ~$60/mo |
 | **Anthropic** Haiku 4.5 | ~$5-10/mo | ~$80/mo |
+| **Kimi 2.6** Moonshot | ~$3/mo | ~$40/mo |
 | **Groq** Llama 3.3 70B | $0 (free tier) | hits daily limits |
 
 Tools layered on top:

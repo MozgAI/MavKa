@@ -71,6 +71,17 @@ load_provider() {
       PROVIDER_PI_NAME="anthropic"
       PROVIDER_NOTE="Claude Haiku 4.5. \$5 starter credit ≈ 2 weeks of daily use."
       ;;
+    kimi)
+      PROVIDER_NAME="kimi"
+      PROVIDER_LABEL="Kimi 2.6"
+      PROVIDER_URL="platform.moonshot.ai"
+      PROVIDER_VERIFY_URL="https://api.moonshot.ai/v1/chat/completions"
+      PROVIDER_VERIFY_MODEL="kimi-k2-0905-preview"
+      PROVIDER_RUN_MODEL="kimi-k2-0905-preview"
+      PROVIDER_KEY_PREFIX="sk-"
+      PROVIDER_PI_NAME="moonshot"
+      PROVIDER_NOTE="Moonshot Kimi-K2. Long-context, strong on coding."
+      ;;
     groq)
       PROVIDER_NAME="groq"
       PROVIDER_LABEL="Groq"
@@ -263,10 +274,11 @@ collect_info() {
   step_header 2 "AI Provider" "required"
   echo -e "  ${DIM}Pick the brain that powers your bot. You can switch later.${NC}"
   echo ""
-  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}    ${DIM}— cheapest. ~\$2/month for casual use. (recommended)${NC}"
-  echo -e "  ${WHITE}2${NC} ${BOLD}OpenAI${NC}      ${DIM}— GPT-4o-mini. ~\$5/month, mainstream choice.${NC}"
-  echo -e "  ${WHITE}3${NC} ${BOLD}Anthropic${NC}   ${DIM}— Claude Haiku 4.5. ~\$5-10/month, smartest small model.${NC}"
-  echo -e "  ${WHITE}4${NC} ${BOLD}Groq${NC}        ${DIM}— Llama 3.3 70B. Free tier, fastest, daily limits.${NC}"
+  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}    ${DIM}— ~\$2/month, cheapest. (recommended)${NC}"
+  echo -e "  ${WHITE}2${NC} ${BOLD}OpenAI${NC}      ${DIM}— GPT-4o-mini, API key. (OAuth coming)${NC}"
+  echo -e "  ${WHITE}3${NC} ${BOLD}Anthropic${NC}   ${DIM}— Claude Haiku 4.5, API key.${NC}"
+  echo -e "  ${WHITE}4${NC} ${BOLD}Kimi 2.6${NC}    ${DIM}— Moonshot Kimi-K2, API key. Long-context.${NC}"
+  echo -e "  ${WHITE}5${NC} ${BOLD}Groq${NC}        ${DIM}— Llama 3.3 70B, free tier with daily limits.${NC}"
   echo ""
 
   read -p "  ▸ " PROV_CHOICE
@@ -274,7 +286,8 @@ collect_info() {
     1) load_provider "deepseek" ;;
     2) load_provider "openai" ;;
     3) load_provider "anthropic" ;;
-    4) load_provider "groq" ;;
+    4) load_provider "kimi" ;;
+    5) load_provider "groq" ;;
     *) load_provider "deepseek" ;;
   esac
 
