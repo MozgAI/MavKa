@@ -233,14 +233,15 @@ CYAN = "\033[0;36m"
 BOLD = "\033[1m"
 
 def ai_print(text):
-    # AI message — wrap nicely without leading marker on continuation lines
+    # AI message — leaf marker on first line, green text matching the logo
+    print()  # blank line above — separates from user input
     lines = text.strip().split("\n")
     for i, line in enumerate(lines):
         if not line.strip():
             print()
             continue
-        marker = f"{GREEN}~{NC}" if i == 0 else "  "
-        print(f"  {marker} {GREY}{line.strip()}{NC}")
+        marker = "🍃" if i == 0 else "  "
+        print(f"  {marker} {GREEN}{line.strip()}{NC}")
 
 def ai_ok(text):
     print(f"  {GREEN}✓{NC} {WHITE}{text}{NC}")
@@ -404,7 +405,7 @@ while step_idx < len(STEPS):
         tag = "required" if required else "optional"
         print(f"  {DIM}{bar}  step {step_idx+1}/{total} · {label} · {tag}{NC}")
         try:
-            user_input = input(f"  {CYAN}you ›{NC} ")
+            user_input = input(f"  ▫️  {WHITE}")
         except (EOFError, KeyboardInterrupt):
             print()
             ai_print("Setup cancelled. Run 'bash install.sh' to start again.")
