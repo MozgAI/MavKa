@@ -51,7 +51,7 @@ load_provider() {
       ;;
     openai)
       PROVIDER_NAME="openai"
-      PROVIDER_LABEL="OpenAI"
+      PROVIDER_LABEL="ChatGPT"
       PROVIDER_URL="platform.openai.com"
       PROVIDER_VERIFY_URL="https://api.openai.com/v1/chat/completions"
       PROVIDER_VERIFY_MODEL="gpt-4o-mini"
@@ -62,14 +62,14 @@ load_provider() {
       ;;
     anthropic)
       PROVIDER_NAME="anthropic"
-      PROVIDER_LABEL="Anthropic"
+      PROVIDER_LABEL="Opus"
       PROVIDER_URL="console.anthropic.com"
       PROVIDER_VERIFY_URL="https://api.anthropic.com/v1/messages"
-      PROVIDER_VERIFY_MODEL="claude-haiku-4-5"
-      PROVIDER_RUN_MODEL="claude-haiku-4-5"
+      PROVIDER_VERIFY_MODEL="claude-opus-4-7"
+      PROVIDER_RUN_MODEL="claude-opus-4-7"
       PROVIDER_KEY_PREFIX="sk-ant-"
       PROVIDER_PI_NAME="anthropic"
-      PROVIDER_NOTE="Claude Haiku 4.5. \$5 starter credit ≈ 2 weeks of daily use."
+      PROVIDER_NOTE="Claude Opus 4.7 — flagship reasoning. Higher cost."
       ;;
     kimi)
       PROVIDER_NAME="kimi"
@@ -274,11 +274,11 @@ collect_info() {
   step_header 2 "AI Provider" "required"
   echo -e "  ${DIM}Pick the brain that powers your bot. You can switch later.${NC}"
   echo ""
-  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}    ${DIM}— ~\$2/month, cheapest. (recommended)${NC}"
-  echo -e "  ${WHITE}2${NC} ${BOLD}OpenAI${NC}      ${DIM}— GPT-4o-mini, API key. (OAuth coming)${NC}"
-  echo -e "  ${WHITE}3${NC} ${BOLD}Anthropic${NC}   ${DIM}— Claude Haiku 4.5, API key.${NC}"
-  echo -e "  ${WHITE}4${NC} ${BOLD}Kimi 2.6${NC}    ${DIM}— Moonshot Kimi-K2, API key. Long-context.${NC}"
-  echo -e "  ${WHITE}5${NC} ${BOLD}Groq${NC}        ${DIM}— Llama 3.3 70B, free tier with daily limits.${NC}"
+  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}     ${DIM}— ~\$2/month, cheapest${NC}  ${PURPLE}(recommended)${NC}"
+  echo -e "  ${WHITE}2${NC} ${BOLD}ChatGPT${NC}      ${DIM}— OpenAI, API key${NC}"
+  echo -e "  ${WHITE}3${NC} ${BOLD}Opus${NC}         ${DIM}— Anthropic, API key${NC}"
+  echo -e "  ${WHITE}4${NC} ${BOLD}Kimi 2.6${NC}     ${DIM}— Moonshot, API key. Long-context${NC}"
+  echo -e "  ${WHITE}5${NC} ${BOLD}Groq${NC}         ${DIM}— Llama 3.3 70B, free tier with daily limits${NC}"
   echo ""
 
   read -p "  ▸ " PROV_CHOICE
