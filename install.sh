@@ -402,13 +402,18 @@ while step_idx < len(STEPS):
     messages.append({"role": "assistant", "content": response})
     ai_print(response)
 
+    first_input_on_step = True
     while True:
         print()
-        # compact step indicator above prompt — always visible
-        total = len(STEPS)
-        bar = f"{GREEN}{'█' * step_idx}{DIM}{'·' * (total - step_idx)}{NC}"
-        tag = "required" if required else "optional"
-        print(f"  {DIM}{bar}  step {step_idx+1}/{total} · {label} · {tag}{NC}")
+        # Show compact step indicator only when user has lingered on the same
+        # step (asked questions, chatted). On the first input right after the
+        # big step header, it's redundant.
+        if not first_input_on_step:
+            total = len(STEPS)
+            bar = f"{GREEN}{'█' * step_idx}{DIM}{'·' * (total - step_idx)}{NC}"
+            tag = "required" if required else "optional"
+            print(f"  {DIM}{bar}  step {step_idx+1}/{total} · {label} · {tag}{NC}")
+        first_input_on_step = False
         try:
             user_input = input(f"  ▫️  {WHITE}")
         except (EOFError, KeyboardInterrupt):
