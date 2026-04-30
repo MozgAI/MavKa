@@ -129,18 +129,18 @@ collect_info() {
   echo ""
   echo -e "  ${DIM}$L_pick_lang${NC}"
   echo ""
-  echo -e "  ${DIM}🇬🇧 ${WHITE}1${DIM} English      🇺🇦 ${WHITE}2${DIM} Українська    🇷🇺 ${WHITE}3${DIM} Русский${NC}"
-  echo -e "  ${DIM}🇩🇪 ${WHITE}4${DIM} Deutsch      🇫🇷 ${WHITE}5${DIM} Français      🇪🇸 ${WHITE}6${DIM} Español${NC}"
+  echo -e "  ${DIM}🇬🇧 ${WHITE}1${DIM} English      🇺🇦 ${WHITE}2${DIM} Українська    🇫🇷 ${WHITE}3${DIM} Français${NC}"
+  echo -e "  ${DIM}🇩🇪 ${WHITE}4${DIM} Deutsch      🇪🇸 ${WHITE}5${DIM} Español       🇷🇺 ${WHITE}6${DIM} Русский${NC}"
   echo ""
 
   read -p "  Choice [1]: " LANG_CHOICE
   case "${LANG_CHOICE:-1}" in
     1) BOT_LANG="en" ;;
     2) BOT_LANG="uk" ;;
-    3) BOT_LANG="ru" ;;
+    3) BOT_LANG="fr" ;;
     4) BOT_LANG="de" ;;
-    5) BOT_LANG="fr" ;;
-    6) BOT_LANG="es" ;;
+    5) BOT_LANG="es" ;;
+    6) BOT_LANG="ru" ;;
     *) BOT_LANG="en" ;;
   esac
 
