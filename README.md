@@ -24,7 +24,7 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · open source · MIT</sub>
+  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · open source · MIT</sub>
 </p>
 
 <p align="center">
@@ -62,7 +62,8 @@ So I stopped buying servers and built **MavKa** — a one-line installer that dr
 | **Price** | $20/month | **~$2/month** |
 | **Brain** | One model, take it or leave it | **5 providers**, swap anytime |
 | **Where you use it** | Their app, their UI, their rules | **Telegram + your terminal** |
-| **Voice in** | Yes | Yes (Groq Whisper) |
+| **Voice in** | Yes | Yes (Groq Whisper, free) |
+| **Voice out (TTS)** | App only | **Yes — replies as voice notes (free Edge TTS)** |
 | **Vision** | Yes | Yes (Gemini) |
 | **Web Search** | Yes | Yes (Tavily) |
 | **Memory** | Black box, theirs | **Persistent wiki, yours** |
@@ -83,7 +84,7 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 |---|---|---|---|
 | Price | $20/mo | Pay-per-token | **~$2/mo (DeepSeek)** |
 | Where you talk to it | IDE only | Terminal only | **Telegram + terminal** |
-| Voice control | No | No | **Yes** |
+| Voice control (in + out) | No | No | **Yes — fully hands-free** |
 | Photo / screenshot understanding | No | No | **Yes** |
 | Switch model providers | Limited | Limited | **5 providers, anytime** |
 | Memory across sessions | Limited | Limited | **Persistent wiki** |
@@ -94,7 +95,9 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 Most AI tools force a choice: a **chat app** on your phone, or a **coding agent** on your PC. MavKa is both — sharing the same brain, the same memory, the same conversation.
 
 ### 📱 On your phone — ChatGPT in Telegram
-Voice notes, photo analysis, web search, persistent memory. No app to install. Open Telegram, talk to your AI. Same chat works on your phone, tablet, watch, anywhere Telegram runs.
+Voice in, voice out, photo analysis, web search, persistent memory. **Talk to MavKa hands-free** — send a voice note, get a voice note back. Driving, cooking, working out — keep going, MavKa speaks. No app to install. Same chat works on your phone, tablet, watch, anywhere Telegram runs.
+
+> Voice in via **Groq Whisper** (free 8h/day). Voice out via **Microsoft Edge TTS** (free, no key). **Hands-free conversation costs zero on top of the LLM tokens.**
 
 ### 💻 On your PC — coding agent like Claude Code
 Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask MavKa in Telegram to refactor a file on your laptop — it just does it.
@@ -111,19 +114,19 @@ Voice-driven coding, repo refactors, debugging, commits, deployments — all fro
 ### 🎓 Students & learners
 Explain a calculus problem with a photo of the page. Summarize a 60-page PDF. Practice a foreign language out loud (voice in, voice out). Get tutored on any topic — MavKa remembers what you already know.
 
-### 🏠 At home — recipes, lifehacks, household
-*"What can I cook with these?"* — send a photo of your fridge.
-*"Best way to remove red wine from white shirt?"* — voice question while doing laundry.
+### 🏠 At home — recipes, lifehacks, household (hands-free)
+Hands wet, dough on fingers, baby on hip — talk to MavKa, get voice answers back.
+*"What can I cook with these?"* — photo of your fridge.
+*"Best way to remove red wine from white shirt?"* — voice while doing laundry.
 *"Make me a 7-day meal plan, $80 budget, two people"* — done.
 *"Read this label, is it gluten-free?"* — photo of the package.
 
 ### 🥗 Diet, fitness, calories
 Send a photo of your plate — MavKa estimates calories and macros. Discuss meal plans, training programs, swap exercises. Track progress in persistent memory across weeks.
 
-### 💪 At the gym
-*"I'm at the gym, all dumbbells busy. Build me a chest workout with just barbells."*
-*"How do I do a Romanian deadlift correctly?"* — get a step-by-step.
-Send a video of your form (well, a photo for now), get notes.
+### 💪 At the gym (hands-free)
+Hold up your phone, say *"I'm at the gym, dumbbells busy. Build me a chest workout with just barbells."* — MavKa replies as a voice note. Keep training. No screen, no typing.
+*"How do I do a Romanian deadlift correctly?"* — voice in, voice out. Step-by-step in your earbuds.
 
 ### 💄 Beauty, skincare, style
 *"Read these ingredients — anything I should avoid for sensitive skin?"*
