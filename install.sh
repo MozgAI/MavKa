@@ -195,7 +195,7 @@ ai_guided_setup() {
   AI_SCRIPT="/tmp/mavka-ai-setup.py"
 
   cat > "$AI_SCRIPT" << 'AIEOF'
-import json, sys, os, re, subprocess
+import json, sys, os, re, subprocess, textwrap
 
 DEEPSEEK_KEY = os.environ.get("MAVKA_DS_KEY", "")
 BOT_LANG = os.environ.get("MAVKA_LANG", "en")
@@ -234,16 +234,25 @@ config = {
 CYAN = "\033[0;36m"
 BOLD = "\033[1m"
 
+LINE_WIDTH = 72  # wrap AI messages at this width
+
 def ai_print(text):
-    # AI message — leaf marker on first line, green text matching the logo
-    print()  # blank line above — separates from user input
-    lines = text.strip().split("\n")
-    for i, line in enumerate(lines):
-        if not line.strip():
-            print()
-            continue
-        marker = "🍃" if i == 0 else "  "
-        print(f"  {marker} {GREEN}{line.strip()}{NC}")
+    # AI message — leaf on first line, indented green text on continuations.
+    # Wraps long lines at LINE_WIDTH so output never reaches the screen edge.
+    print()  # gap above the message
+    paragraphs = [p.strip() for p in text.strip().split("\n") if p.strip()]
+    first = True
+    for para in paragraphs:
+        wrapped = textwrap.wrap(
+            para, width=LINE_WIDTH,
+            break_long_words=False, break_on_hyphens=False
+        ) or [""]
+        for j, line in enumerate(wrapped):
+            if first and j == 0:
+                print(f"  🍃 {GREEN}{line}{NC}")
+                first = False
+            else:
+                print(f"     {GREEN}{line}{NC}")
 
 def ai_ok(text):
     print(f"  {GREEN}✓{NC} {WHITE}{text}{NC}")
@@ -404,6 +413,7 @@ while step_idx < len(STEPS):
 
     while True:
         print()
+        print()  # extra gap between AI message and user prompt
         try:
             user_input = input(f"  ▫️  {WHITE}")
         except (EOFError, KeyboardInterrupt):
