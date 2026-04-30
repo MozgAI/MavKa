@@ -974,7 +974,126 @@ create_files() {
 
   MAVKA_HOME="$HOME/mavka-bot"
   mkdir -p "$MAVKA_HOME/memory"
+  mkdir -p "$MAVKA_HOME/memory/raw"
+  mkdir -p "$MAVKA_HOME/memory/summaries"
+  mkdir -p "$MAVKA_HOME/history"
   mkdir -p "$HOME/.pi/agent"
+
+  # ── Seed memory wiki (LLM Wiki Protocol) ──
+  TODAY="$(date +%Y-%m-%d)"
+  TIMESTAMP="$(date +%Y-%m-%d\ %H:%M)"
+
+  if [ ! -f "$MAVKA_HOME/memory/MEMORY.md" ]; then
+    cat > "$MAVKA_HOME/memory/MEMORY.md" << MEMINDEXEOF
+# Memory Index
+
+This is the lean index of $BOT_NAME's long-term memory. Each line is one wiki page.
+Keep this file under 200 lines. One line per page, ≤150 chars per line.
+Format: \`- [Title](file.md) — one-line hook\`
+
+## User
+- [user_profile.md](user_profile.md) — basic user info (will fill in as we talk)
+
+## Feedback / Rules of behavior
+(none yet — when the user gives me a rule, I'll create a feedback_*.md page)
+
+## Projects
+(none yet — when the user mentions an active project, I'll create a project_*.md page)
+
+## Concepts
+(none yet — broad cross-cutting topics)
+
+## Reference
+(none yet — pointers to external systems / docs)
+MEMINDEXEOF
+  fi
+
+  if [ ! -f "$MAVKA_HOME/memory/log.md" ]; then
+    cat > "$MAVKA_HOME/memory/log.md" << MEMLOGEOF
+# Memory Log
+
+Append-only chronology of memory operations: INGEST (new fact stored), QUERY (notable lookup), LINT (audit).
+
+Format: \`YYYY-MM-DD HH:MM | OP | details\`
+
+---
+
+$TIMESTAMP | INIT | $BOT_NAME memory wiki created (LLM Wiki Protocol).
+MEMLOGEOF
+  fi
+
+  if [ ! -f "$MAVKA_HOME/memory/user_profile.md" ]; then
+    cat > "$MAVKA_HOME/memory/user_profile.md" << USERPROFEOF
+---
+name: User profile
+description: Core facts about the person I'm talking to (name, role, location, family, goals)
+type: user
+hall: facts
+frozen: true
+valid_from: $TODAY
+---
+
+# User profile
+
+This is what I know about my user. I'll add facts here as I learn them through conversation.
+
+## Basics
+- **Name:** unknown
+- **Location:** unknown
+- **Role / occupation:** unknown
+- **Languages spoken:** unknown
+
+## Family
+- (will add as I learn)
+
+## Goals (long-term)
+- (will add as I learn)
+
+## Health / preferences worth remembering
+- (will add as I learn)
+
+---
+
+**Frozen:** This page is the trusted core profile. To update an existing fact, mark the old line with \`(ended: YYYY-MM-DD)\` and add the new fact below it. Don't delete history.
+USERPROFEOF
+  fi
+
+  if [ ! -f "$MAVKA_HOME/memory/feedback_template.md" ]; then
+    cat > "$MAVKA_HOME/memory/feedback_template.md" << FBTPLEOF
+---
+name: Template — how to write a feedback page
+description: Reference template — copy this when creating a new feedback_*.md page
+type: feedback
+hall: preferences
+frozen: true
+---
+
+# Template
+
+When the user gives you a behavioral rule (e.g. "don't use markdown in Telegram", "always reply in Russian", "no emoji in business chats"), create a new file \`feedback_<short_name>.md\` and use this structure:
+
+\`\`\`markdown
+---
+name: <Short rule title>
+description: <One-line summary used to retrieve this rule later>
+type: feedback
+hall: preferences
+frozen: true
+valid_from: $TODAY
+---
+
+<The rule itself, stated clearly in one line.>
+
+**Why:** <The reason the user gave — usually a past incident or strong preference. Knowing why lets you judge edge cases.>
+
+**How to apply:** <When/where this rule kicks in. Be specific about contexts.>
+\`\`\`
+
+After creating, add a one-line entry to \`MEMORY.md\` under the "Feedback / Rules of behavior" section, and a row to \`log.md\`.
+
+This template page itself is just a reference — don't load it as a real rule.
+FBTPLEOF
+  fi
 
   # ── IDENTITY.md ──
   cat > "$MAVKA_HOME/IDENTITY.md" << IDENTITYEOF
@@ -1007,20 +1126,114 @@ Accept input in any language, respond in ${BOT_LANG} unless asked otherwise.
 - Text-to-speech: \`bash ~/mavka-bot/tts.sh "text" /tmp/voice.ogg\`
 - Photo analysis: \`bash ~/mavka-bot/vision.sh /path/image.jpg "question"\`
 
-## Memory System
-You have persistent memory in ~/mavka-bot/memory/:
-- **MEMORY.md** — index of all memory files
-- **rules.md** — user preferences and rules
-- **conversations.md** — important facts from chats
+## Memory System — LLM Wiki Protocol
 
-**On startup:** Read MEMORY.md and rules.md
-**During conversation:** Save important decisions to memory files
-**Format:** Date each entry: "$(date +%Y-%m-%d): fact..."
+You have persistent long-term memory in ~/mavka-bot/memory/. Every important fact about the user, their projects, their preferences, their decisions — lives in this wiki and survives restarts. This is your "second brain."
+
+### Structure
+
+- ~/mavka-bot/memory/MEMORY.md          ← INDEX, lean (≤200 lines), one line per page
+- ~/mavka-bot/memory/log.md             ← append-only audit (INGEST/QUERY/LINT events)
+- ~/mavka-bot/memory/user_profile.md    ← FROZEN: who the user is
+- ~/mavka-bot/memory/feedback_*.md      ← FROZEN: rules of behavior the user gave you
+- ~/mavka-bot/memory/project_*.md       ← active projects, goals, deadlines
+- ~/mavka-bot/memory/concept_*.md       ← generalizing pages (cross-cutting topics)
+- ~/mavka-bot/memory/raw/               ← raw sources (pasted articles, screenshots)
+
+### Page format (frontmatter at top of every page)
+
+\`\`\`
+---
+name: <short title>
+description: <one-line hook used to decide relevance later — be specific>
+type: user | feedback | project | reference | concept
+hall: facts | events | discoveries | preferences | advice
+frozen: true            (optional — locks the page from rewrites)
+valid_from: 2026-04-30  (optional — date the fact became true)
+ended: 2026-12-01       (optional — date the fact stopped being true)
+---
+
+<page body>
+\`\`\`
+
+For feedback/project/concept pages, lead with the rule, then add a **Why:** line and a **How to apply:** line.
+
+### Halls (semantic taxonomy — answers "what kind of memory is this")
+
+- facts — stable truths (user_profile, setup, references)
+- events — time-bound (project status, deadlines, incidents)
+- discoveries — generalizations / insights
+- preferences — what the user wants (style, format, tone)
+- advice — corrective rules ("don't do X because…")
+
+### Operations
+
+**ON EVERY TURN — QUERY (cheap path):**
+1. The MEMORY.md index is already in your system prompt — see what pages exist.
+2. Open ONLY the pages relevant to this question (use your read tool).
+3. When citing a memory fact, mention which page it came from.
+4. If memory disagrees with new info, trust the new info but mark for INGEST.
+
+**WHEN YOU LEARN SOMETHING NEW — INGEST:**
+1. Decide which existing page it belongs to, or create a new one with proper frontmatter.
+2. NEVER overwrite a frozen page — only add cross-links to it like [[other_page.md]].
+3. PREFER creating a new concept page over rewriting old ones (drift protection).
+4. Update temporal fields if the fact has a lifecycle (valid_from / ended).
+5. Append a one-line entry to log.md in this exact format:
+   \`YYYY-MM-DD HH:MM | INGEST | <what> → <pages>\`
+6. If you create a new page, add a one-line pointer to MEMORY.md (one line, ≤150 chars).
+
+**WHEN AMBIGUOUS — DO NOT HALLUCINATE:**
+- If you don't know, write "unknown" — never invent.
+- Every fact needs provenance (raw/, prior conversation, URL).
+- Convert relative dates to absolute when saving ("Thursday" → "2026-05-08").
+
+### Critical rules (NEVER break)
+
+1. NEVER delete a memory page without explicit user confirmation.
+2. Frozen pages are read-only for content. You can add cross-links to them.
+3. MEMORY.md is the index — keep it under 200 lines, one line per page.
+4. Don't write conversation history into memory. Memory is for facts, decisions, preferences — not chat logs.
+5. Don't duplicate. Before creating a new page, search MEMORY.md for an existing page that covers it.
+6. raw/ is the first source of truth — wiki pages are summaries.
+
+### Format examples
+
+\`feedback_no_emoji.md\`:
+\`\`\`
+---
+name: No emoji in business contexts
+description: User dislikes emoji in formal/business replies
+type: feedback
+hall: preferences
+frozen: true
+---
+Don't use emoji in business or formal contexts.
+
+**Why:** User mentioned 2026-05-01 — "looks unprofessional in client emails."
+**How to apply:** Plain text for anything labeled "client", "business", "formal". Casual chat is fine.
+\`\`\`
+
+\`project_yoff.md\`:
+\`\`\`
+---
+name: YOFF — handyman + cleaning Calgary
+description: Calgary local services, drain/handyman/cleaning, vivid.yoff.ca + luxe.yoff.ca
+type: project
+hall: events
+valid_from: 2026-04-12
+---
+Active local services business. Two landings: vivid.yoff.ca (handyman), luxe.yoff.ca (cleaning).
+
+**Goal:** lead generation in Calgary, builder license obtained.
+
+[[user_profile.md]] [[calgary_business.md]]
+\`\`\`
 
 ## Identity
-- **Model:** DeepSeek V4 Flash (via DeepSeek API)
-- **Framework:** Pi Agent + pi-telegram
-- **You are NOT Claude, NOT GPT, NOT Gemini.**
+- **Provider:** ${PROVIDER_LABEL}
+- **Framework:** Pi Agent + pi-telegram + LLM Wiki memory
+- **You are NOT Claude, NOT GPT, NOT Gemini.** You are ${BOT_NAME}.
 IDENTITYEOF
 
   ok "Identity created"
@@ -1047,8 +1260,20 @@ cd "\$HOME/mavka-bot"
 PROMPT_FILE="/tmp/mavka-prompt.md"
 cat "\$HOME/mavka-bot/IDENTITY.md" > "\$PROMPT_FILE"
 echo "" >> "\$PROMPT_FILE"
-echo "## MEMORY SNAPSHOT (\$(date +%Y-%m-%d))" >> "\$PROMPT_FILE"
-for f in "\$HOME/mavka-bot/memory/"*.md; do
+
+# LLM Wiki: load only the lean index + frozen core (≤2K tokens total).
+# Detail pages are read on-demand by the agent through its read tool.
+echo "## MEMORY INDEX (as of \$(date +%Y-%m-%d))" >> "\$PROMPT_FILE"
+echo "" >> "\$PROMPT_FILE"
+if [ -f "\$HOME/mavka-bot/memory/MEMORY.md" ]; then
+  cat "\$HOME/mavka-bot/memory/MEMORY.md" >> "\$PROMPT_FILE"
+fi
+echo "" >> "\$PROMPT_FILE"
+echo "## FROZEN CORE" >> "\$PROMPT_FILE"
+echo "" >> "\$PROMPT_FILE"
+# Inline only the frozen pages (user_profile + feedback_*) — they're stable
+# and small. Everything else is read on demand.
+for f in "\$HOME/mavka-bot/memory/user_profile.md" "\$HOME/mavka-bot/memory/feedback_"*.md; do
   [ -f "\$f" ] || continue
   echo "### \$(basename \$f)" >> "\$PROMPT_FILE"
   cat "\$f" >> "\$PROMPT_FILE"
@@ -1187,24 +1412,64 @@ VISIONEOF
 
   ok "Tools created (search, whisper, tts, vision)"
 
-  # ── Memory ──
-  cat > "$MAVKA_HOME/memory/MEMORY.md" << 'MEMEOF'
-# MavKa Memory
+  # ── Memory wiki lint script ──
+  # Run manually or schedule weekly via launchd/systemd:
+  #   bash ~/mavka-bot/lint.sh
+  cat > "$MAVKA_HOME/lint.sh" << 'LINTEOF'
+#!/bin/bash
+# MavKa memory wiki lint — finds orphans, broken cross-links, stale pages.
+MEM="$HOME/mavka-bot/memory"
+[ -d "$MEM" ] || { echo "no memory dir"; exit 1; }
 
-## Files
-- [rules.md](rules.md) — user preferences
-- [conversations.md](conversations.md) — important facts from chats
-MEMEOF
+echo "== Memory wiki lint =="
+echo
 
-  cat > "$MAVKA_HOME/memory/rules.md" << 'MEMEOF'
-# Rules & Preferences
-MEMEOF
+cd "$MEM" || exit 1
 
-  cat > "$MAVKA_HOME/memory/conversations.md" << 'MEMEOF'
-# Conversations
-MEMEOF
+# Collect all .md files in memory/ (excluding raw/ and summaries/)
+ALL=$(find . -maxdepth 1 -name '*.md' -not -name 'MEMORY.md' -not -name 'log.md' | sed 's|^\./||' | sort)
 
-  ok "Memory system initialized"
+# Orphans: files not referenced from MEMORY.md
+echo "-- Orphans (files not listed in MEMORY.md) --"
+for f in $ALL; do
+  if ! grep -q "$f" MEMORY.md 2>/dev/null; then
+    echo "  orphan: $f"
+  fi
+done
+echo
+
+# Broken cross-links: [[file.md]] referenced but file missing
+echo "-- Broken cross-links --"
+grep -roh '\[\[[^]]*\]\]' --include='*.md' . 2>/dev/null | sort -u | while read link; do
+  target=$(echo "$link" | sed 's/\[\[//;s/\]\]//')
+  [ -f "$target" ] || echo "  broken: $link"
+done
+echo
+
+# Stale: pages with valid_from older than 60 days and no recent activity in log.md
+echo "-- Stale pages (valid_from > 60 days, no recent INGEST in log) --"
+NOW=$(date +%s)
+for f in $ALL; do
+  vf=$(grep -m1 '^valid_from:' "$f" 2>/dev/null | awk '{print $2}')
+  [ -n "$vf" ] || continue
+  vf_s=$(date -j -f "%Y-%m-%d" "$vf" +%s 2>/dev/null || date -d "$vf" +%s 2>/dev/null)
+  [ -n "$vf_s" ] || continue
+  age=$(( (NOW - vf_s) / 86400 ))
+  if [ "$age" -gt 60 ]; then
+    if ! grep -q "$f" log.md 2>/dev/null; then
+      echo "  stale: $f (valid_from $vf, age ${age}d, never touched in log)"
+    fi
+  fi
+done
+echo
+
+echo "-- Summary --"
+echo "  pages: $(echo "$ALL" | wc -l | tr -d ' ')"
+echo "  index size: $(wc -l < MEMORY.md | tr -d ' ') lines"
+echo "  log entries: $(grep -c '|' log.md 2>/dev/null || echo 0)"
+LINTEOF
+  chmod +x "$MAVKA_HOME/lint.sh"
+  ok "Memory wiki seeded (LLM Wiki Protocol) + lint script"
 }
 
 # ─── Configure Pi Agent ───────────────────────────────────────
