@@ -5,7 +5,19 @@
 <h3 align="center">Your own AI. In Telegram. On your machine. For almost nothing.</h3>
 
 <p align="center">
-  <a href="#install"><strong>Install</strong></a> ·
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
+```
+
+</p>
+
+<p align="center">
+  <sub>macOS · Linux · 5 minutes · ~$2/month</sub>
+</p>
+
+<p align="center">
+  <a href="#install"><strong>Install details</strong></a> ·
   <a href="#two-products-in-one">What it does</a> ·
   <a href="#the-real-cost">Cost</a> ·
   <a href="#privacy--data">Privacy</a> ·
