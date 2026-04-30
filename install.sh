@@ -1127,10 +1127,37 @@ Accept input in any language, respond in ${BOT_LANG} unless asked otherwise.
 ## Tools Available
 - Web search: \`bash ~/mavka-bot/search.sh "query" 5\`
 - Voice transcription: \`bash ~/mavka-bot/whisper.sh /path/audio.ogg\`
+- Voice → English translation (the "British" mode): \`bash ~/mavka-bot/whisper.sh /path/audio.ogg --british\`
 - Text-to-speech: \`bash ~/mavka-bot/tts.sh "text" /tmp/voice.ogg\`
 - Photo analysis: \`bash ~/mavka-bot/vision.sh /path/image.jpg "question"\`
 - Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
 - Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
+- Hot-swap API key: \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`  (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
+
+## "British" mode — instant voice-to-English translation
+
+When the user says "Британец", "позови Британця", "включи британца", or anything semantically equivalent — switch into British mode:
+1. Create marker: \`touch ~/mavka-bot/.british_mode\`
+2. Reply: "Диктуй, переведу" (or similar one-line acknowledgement)
+3. From now on, when a voice message arrives, run \`whisper.sh <audio> --british\` instead of normal whisper. The output is English text (Whisper translates natively, no LLM step needed).
+4. Reply with ONLY the translated text inside a triple-backtick code block. No prefixes, no flags, no commentary, no "here's the translation". Just the code block. Like this:
+\\\`\\\`\\\`
+Hello, today I went to the gym and met John there.
+\\\`\\\`\\\`
+
+When the user says "вимкни Британця" / "хватит" / "выключи британца" — \`rm ~/mavka-bot/.british_mode\` and confirm in one short sentence. Voice messages return to normal transcription.
+
+Check the marker file at the start of every voice handler to know which mode is active.
+
+## Hot-swap API key — when the user wants to change provider keys
+
+If the user says "поменяй ключ на ...", "вот новый ключ для DeepSeek: sk-...", "хочу переподключить openai с новым ключом" or anything similar:
+1. Identify the provider name from context (deepseek / openai / anthropic / moonshotai / groq / google / tavily).
+2. Run \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`.
+3. The script updates auth.json (or start.sh for tavily), runs chmod 0600, and restarts MavKa automatically.
+4. Confirm to the user: "Ключ обновлён, бот перезапущен. Готово." (or the equivalent in their language).
+
+This is the ONLY supported way to change keys after installation — never tell the user to re-run install.sh just to change a key.
 
 ## Memory System — LLM Wiki Protocol
 
@@ -1358,20 +1385,104 @@ SEARCHEOF
   chmod +x "$MAVKA_HOME/search.sh"
 
   # ── whisper.sh ──
+  # Two modes:
+  #   normal:   transcribe audio in its native language (auto-detect)
+  #   --british: translate ANY language → English natively via Groq /translations
+  #              (no LLM step — Whisper itself does the translation)
   cat > "$MAVKA_HOME/whisper.sh" << 'WHISPEREOF'
 #!/bin/bash
 AUDIO="$1"
+MODE="${2:-normal}"
 [ -z "$AUDIO" ] || [ ! -f "$AUDIO" ] && { echo "Error: audio file not found"; exit 1; }
 GROQ_KEY="${GROQ_API_KEY}"
 [ -z "$GROQ_KEY" ] && { echo "Error: GROQ_API_KEY not set"; exit 1; }
+
 EXT="${AUDIO##*.}"; TMP="/tmp/mavka_whisper.${EXT}"
 cp "$AUDIO" "$TMP"
 [[ "$EXT" == "oga" ]] && { mv "$TMP" "/tmp/mavka_whisper.ogg"; TMP="/tmp/mavka_whisper.ogg"; }
-curl -s -X POST 'https://api.groq.com/openai/v1/audio/transcriptions' \
-  -H "Authorization: Bearer $GROQ_KEY" \
-  -F "file=@$TMP" -F 'model=whisper-large-v3' -F 'response_format=text'
+
+if [ "$MODE" == "--british" ]; then
+  # British mode: any language → English (Whisper native translation)
+  curl -s -X POST 'https://api.groq.com/openai/v1/audio/translations' \
+    -H "Authorization: Bearer $GROQ_KEY" \
+    -F "file=@$TMP" -F 'model=whisper-large-v3' -F 'response_format=text'
+else
+  # Normal: transcribe in native language (no language hint = auto-detect)
+  curl -s -X POST 'https://api.groq.com/openai/v1/audio/transcriptions' \
+    -H "Authorization: Bearer $GROQ_KEY" \
+    -F "file=@$TMP" -F 'model=whisper-large-v3' -F 'response_format=text'
+fi
+rm -f "$TMP" 2>/dev/null
 WHISPEREOF
   chmod +x "$MAVKA_HOME/whisper.sh"
+
+  # ── setkey.sh — change API key via Telegram, no reinstall needed ──
+  # Usage: bash ~/mavka-bot/setkey.sh <provider> <new_key>
+  # Provider names: deepseek | openai | anthropic | moonshotai | groq | google | tavily
+  cat > "$MAVKA_HOME/setkey.sh" << 'SETKEYEOF'
+#!/bin/bash
+# Update an API key in MavKa's config and restart the bot.
+# Used when the user wants to swap providers or rotate a key without reinstalling.
+PROV="$1"
+NEWKEY="$2"
+
+if [ -z "$PROV" ] || [ -z "$NEWKEY" ]; then
+  cat <<USAGE
+Usage: bash ~/mavka-bot/setkey.sh <provider> <new_key>
+
+Providers (LLM):       deepseek, openai, anthropic, moonshotai, groq
+Providers (tools):     google (Gemini), tavily (search), groq (also voice)
+
+Example:
+  bash ~/mavka-bot/setkey.sh deepseek sk-newkey...
+USAGE
+  exit 1
+fi
+
+case "$PROV" in
+  deepseek|openai|anthropic|moonshotai|groq|google)
+    AUTH="$HOME/.pi/agent/auth.json"
+    [ -f "$AUTH" ] || { echo "Error: $AUTH not found"; exit 1; }
+    AUTH_OUT="$AUTH" PROV="$PROV" NEWKEY="$NEWKEY" python3 - <<'PYEOF'
+import json, os
+path = os.environ['AUTH_OUT']
+with open(path) as f: auth = json.load(f)
+auth[os.environ['PROV']] = {'type':'api_key','key':os.environ['NEWKEY']}
+with open(path, 'w') as f: json.dump(auth, f, indent=2)
+os.chmod(path, 0o600)
+print(f"✓ {os.environ['PROV']} key updated in auth.json")
+PYEOF
+    ;;
+  tavily)
+    # Tavily key is exported as env var in start.sh — patch that line
+    START="$HOME/mavka-bot/start.sh"
+    [ -f "$START" ] || { echo "Error: $START not found"; exit 1; }
+    if grep -q '^export TAVILY_API_KEY=' "$START"; then
+      sed -i.bak "s|^export TAVILY_API_KEY=.*|export TAVILY_API_KEY=\"$NEWKEY\"|" "$START"
+    else
+      echo "export TAVILY_API_KEY=\"$NEWKEY\"" >> "$START"
+    fi
+    rm -f "${START}.bak"
+    chmod 700 "$START"
+    echo "✓ tavily key updated in start.sh"
+    ;;
+  *)
+    echo "Error: unknown provider '$PROV'"
+    echo "Allowed: deepseek, openai, anthropic, moonshotai, groq, google, tavily"
+    exit 1
+    ;;
+esac
+
+# Restart the bot so the new key takes effect
+echo "Restarting MavKa..."
+if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
+  tmux kill-session -t mavka
+  sleep 1
+fi
+[ -x "$HOME/mavka-bot/launch.sh" ] && bash "$HOME/mavka-bot/launch.sh" &>/dev/null &
+echo "✓ MavKa restarted. New key is live."
+SETKEYEOF
+  chmod +x "$MAVKA_HOME/setkey.sh"
 
   # ── tts.sh ──
   cat > "$MAVKA_HOME/tts.sh" << 'TTSEOF'
