@@ -24,7 +24,7 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · open source · MIT</sub>
+  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
 </p>
 
 <p align="center">
@@ -73,6 +73,7 @@ So I stopped buying servers and built **MavKa** — a one-line installer that dr
 | **Where data goes** | OpenAI servers, period | **API providers you choose, keys you own** |
 | **Open source** | No | **Yes (MIT)** |
 | **Self-hostable** | No | **Yes — runs on your machine** |
+| **Setup difficulty** | Sign up → done | **One bash command. AI walks you through the rest.** |
 
 OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your phone. Neither can put a real coding agent on your laptop with the same brain that just answered your voice note.
 
@@ -89,6 +90,7 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 | Switch model providers | Limited | Limited | **5 providers, anytime** |
 | Memory across sessions | Limited | Limited | **Persistent wiki** |
 | Open source | No | No | **Yes (MIT)** |
+| Install help | None — read docs | None — read docs | **AI installs itself, in your language** |
 
 ## Two Products in One
 
@@ -103,6 +105,20 @@ Voice in, voice out, photo analysis, web search, persistent memory. **Talk to Ma
 Built on **Pi Agent** (the open-source engine behind Claude Code, OpenClaw and similar tools). Full file access, shell, computer use. Ask MavKa in Telegram to refactor a file on your laptop — it just does it.
 
 **One install. Two superpowers. ~$2/month.**
+
+## Even Your Mom Can Install It
+
+Here's the dirty secret of every "self-hosted AI agent" out there: **you need another AI to install it.** People literally open ChatGPT or Claude Code in another tab and ask *"how do I configure this auth.json"* — because doing it by hand is fragile, error-prone, and the docs are written for engineers.
+
+**MavKa is the first AI agent where the AI installs itself.** After you give it the API key, the installer hands you over to MavKa's own brain — running live, in your terminal, in your language — and walks you through the rest of setup conversationally:
+
+- *"Я не могу найти этот ключ"* → it explains where to click, in Russian.
+- *"What does Tavily do? Do I need it?"* → straight answer, then asks if you want to skip.
+- *"можем сделать это потом"* → done, on to the next step.
+
+No second tool. No copy-pasting questions to ChatGPT. No engineer in the family.
+
+> **Slogan: "Even your mom can install it."** And we mean it.
 
 ## Who Is MavKa For?
 
