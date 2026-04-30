@@ -206,8 +206,7 @@ collect_info() {
   set_lang "$BOT_LANG"
 
   step_header 2 "DeepSeek API Key" "required"
-  echo -e "  ${DIM}$L_ds_brain${NC}"
-  echo -e "  ${PURPLE}$L_ds_url${NC}"
+  echo -e "  ${DIM}$L_ds_brain ${NC}🍃${DIM}  —  ${PURPLE}$L_ds_url${NC}"
   echo -e "  ${DIM}$L_ds_credit${NC}"
   echo ""
 
@@ -412,6 +411,17 @@ def is_skip(text):
     skip_cues = ("skip", "потом", "позже", "пізніше", "пропуст", "later", "далее", "дальше", "наступн", "следующ", "не сейчас", "не зараз", "обойд", "обійд", "без этого", "не нужно", "не треба", "без него")
     return any(cue in t for cue in skip_cues)
 
+CMD_RE = re.compile(r'\[CMD:(skip|stay|none)\]', re.IGNORECASE)
+
+def split_cmd(reply_text):
+    """Extract the [CMD:...] tag from AI reply. Returns (visible_text, cmd) where cmd in {skip, stay, none, ''}"""
+    if not reply_text:
+        return "", ""
+    matches = CMD_RE.findall(reply_text)
+    cmd = matches[-1].lower() if matches else ""
+    visible = CMD_RE.sub("", reply_text).strip()
+    return visible, cmd
+
 SYSTEM_PROMPT = f"""You are MavKa — a setup assistant inside a terminal installer.
 You help users set up their personal AI Telegram bot.
 
@@ -439,15 +449,20 @@ STEPS:
 7. persona — Bot personality. Offer choices: (1) Smart assistant (2) Nutritionist (3) Chef (4) Language tutor (5) Custom description.
 
 CONVERSATION RULES — VERY IMPORTANT:
-- The installer (not you) decides when to advance to the next step. You just talk.
-- DO NOT say "let's move to the next step" or "переходим к следующему" — when the installer is ready to advance, it will move on automatically and show a new step header. If you announce a transition that doesn't happen, the user will be confused.
-- If the user asks a question, expresses confusion, says they can't find the key — answer them helpfully on the CURRENT step. Stay focused on the current step's value.
-- If the user says skip / later / "потом" / "позже" / "пропустим" / "не сейчас" or similar — just briefly acknowledge ("Окей, можем без этого" / "ok, we can add this later"). DO NOT describe what's next — the installer will show the next step header itself.
-- For REQUIRED steps (telegram_token, telegram_id), if the user wants to skip, gently insist and walk them through getting the value step by step.
-- If the user pastes something that doesn't match the expected key format, the installer will reject it. Help them — explain what the correct format looks like, where to find it again.
-- If the user just wants to chat or asks general questions, answer briefly, then politely return to the current step's question.
-- NO emojis ever.
-- NEVER output CONFIG lines — the installer handles extraction.
+- The installer (not you) decides when to advance. You signal intent via a control tag at the end of every reply.
+- ALWAYS finish every reply with a single control tag on its own line — the installer hides it from the user. Choose ONE:
+    [CMD:skip]   — the user wants to skip this step (clearly: "пропусти", "later", "next", "ну", "давай", "пошли дальше", typos in any layout, gibberish like "lfdfq ghjgrecnbv" if it semantically means "go ahead").
+                   For REQUIRED steps, ONLY emit [CMD:skip] for telegram_token / telegram_id if the user explicitly insists they don't want to set it up at all (rare). Normally for required steps emit [CMD:stay].
+    [CMD:stay]   — the user is asking a question, chatting, confused, or hasn't given a clear answer yet. Stay on this step, no skip.
+    [CMD:none]   — the user pasted what looks like the actual value (key/token/ID/name/persona). The installer will validate the format itself.
+- Read the user's intent carefully. If they say anything that means "yes go on / let's skip / move on / next / not now / I don't have it / fine without it / lfdfq" → emit [CMD:skip].
+- If they say something like "wait / I have a question / how do I get this / what does it do" → emit [CMD:stay].
+- DO NOT narrate "переходим к следующему шагу" in your visible reply — just acknowledge briefly ("Окей, пропускаем" or "Хорошо") and let the installer show the next header.
+- For REQUIRED steps (telegram_token, telegram_id), even if the user says skip, emit [CMD:stay] and gently walk them through getting the value, unless they REPEATEDLY refuse — only then [CMD:skip].
+- If user pastes a long string that may be the actual value, emit [CMD:none] — let the installer's regex decide.
+- If user's reply is empty or ambiguous, emit [CMD:stay] and ask a clarifying question.
+- NO emojis ever in your visible reply.
+- NEVER output CONFIG lines.
 """
 
 messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -474,7 +489,8 @@ while step_idx < len(STEPS):
         continue
 
     messages.append({"role": "assistant", "content": response})
-    ai_print(response)
+    visible, _ = split_cmd(response)  # first AI greeting — no cmd expected
+    ai_print(visible if visible else response)
 
     while True:
         print()
@@ -486,6 +502,16 @@ while step_idx < len(STEPS):
             ai_print("Setup cancelled. Run 'bash install.sh' to start again.")
             sys.exit(1)
 
+        # 1. Try to extract a valid value via regex first — fast path, no API call
+        extracted = validate_input(field, user_input) if field not in ("persona", "bot_name") else None
+        if extracted:
+            config[field] = extracted
+            display_val = extracted[:8] + "•••" if len(extracted) > 12 else extracted
+            ai_ok(f"{label}: {display_val}")
+            step_idx += 1
+            break
+
+        # 2. Local skip detection (covers obvious cases without API call)
         if is_skip(user_input):
             if required:
                 ai_warn(f"{label} is required and cannot be skipped.")
@@ -493,7 +519,8 @@ while step_idx < len(STEPS):
                 resp = call_deepseek(messages)
                 if resp:
                     messages.append({"role": "assistant", "content": resp})
-                    ai_print(resp)
+                    visible, _ = split_cmd(resp)
+                    ai_print(visible if visible else resp)
                 continue
             else:
                 config[field] = ""
@@ -501,11 +528,9 @@ while step_idx < len(STEPS):
                 step_idx += 1
                 break
 
-        # Detect if input looks like an answer for current step.
-        # If not — treat as conversation, let AI reply, stay on this step.
         choice = user_input.strip()
-        is_question = "?" in choice or choice.lower().startswith(("how", "what", "why", "where", "when", "can you", "could you", "как", "что", "почему", "где", "можешь", "ты можешь", "як", "що", "чому", "де", "wie", "was", "warum", "wo", "comment", "qu'est", "pourquoi", "où", "cómo", "qué", "por qué", "dónde"))
 
+        # Hard-coded value handlers for persona / bot_name (numeric/short-text answers)
         if field == "persona":
             persona_map = {
                 "1": "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. Knowledgeable, concise, always honest.",
@@ -518,51 +543,50 @@ while step_idx < len(STEPS):
                 ai_ok("Personality set!")
                 step_idx += 1
                 break
-            elif choice == "5" or (not is_question and len(choice) > 25):
-                # Custom description — only if not a question
-                config["persona"] = choice if len(choice) > 15 else persona_map["1"]
-                ai_ok("Personality set!")
-                step_idx += 1
-                break
-            # Otherwise: question or unclear — let AI respond, stay on step
-            messages.append({"role": "user", "content": user_input})
-            resp = call_deepseek(messages)
-            if resp:
-                messages.append({"role": "assistant", "content": resp})
-                ai_print(resp)
-            continue
+            if choice == "5":
+                # Custom — let AI follow up by asking for description, stay
+                pass
 
-        if field == "bot_name":
-            # Accept name only if it's clearly an answer (short, no question marks)
-            if not is_question and 1 <= len(choice) <= 30 and "!" not in choice:
+        # Ask the AI to interpret intent for everything we couldn't classify locally
+        messages.append({"role": "user", "content": user_input})
+        resp = call_deepseek(messages)
+        if not resp:
+            ai_warn("Connection issue, retrying...")
+            messages.pop()
+            continue
+        messages.append({"role": "assistant", "content": resp})
+        visible, cmd = split_cmd(resp)
+        ai_print(visible if visible else resp)
+
+        if cmd == "skip":
+            if required:
+                # Required step — reinforce, but stay (don't advance)
+                continue
+            config[field] = ""
+            ai_skip(f"{label} — skipped")
+            step_idx += 1
+            break
+
+        if cmd == "none":
+            # AI thinks user provided a value. Try field-specific extraction.
+            if field == "bot_name" and 1 <= len(choice) <= 30:
                 config["bot_name"] = choice
                 ai_ok(f"Bot name: {choice}")
                 step_idx += 1
                 break
-            # Otherwise: question — let AI respond
-            messages.append({"role": "user", "content": user_input})
-            resp = call_deepseek(messages)
-            if resp:
-                messages.append({"role": "assistant", "content": resp})
-                ai_print(resp)
-            continue
-
-        extracted = validate_input(field, user_input)
-
-        if extracted:
-            config[field] = extracted
-            display_val = extracted[:8] + "•••" if len(extracted) > 12 else extracted
-            ai_ok(f"{label}: {display_val}")
-            step_idx += 1
-            break
-        else:
-            # Not a valid key, not a skip → user is asking a question or chatting.
-            # Reply on the same step, do NOT advance.
-            messages.append({"role": "user", "content": user_input})
-            resp = call_deepseek(messages)
-            if resp:
-                messages.append({"role": "assistant", "content": resp})
-                ai_print(resp)
+            if field == "persona" and len(choice) >= 15:
+                config["persona"] = choice
+                ai_ok("Personality set!")
+                step_idx += 1
+                break
+            extracted = validate_input(field, user_input)
+            if extracted:
+                config[field] = extracted
+                display_val = extracted[:8] + "•••" if len(extracted) > 12 else extracted
+                ai_ok(f"{label}: {display_val}")
+                step_idx += 1
+                break
+            # Couldn't validate — stay, AI's reply already informed the user.
 
 print()
 print(f"  {GREEN}{'█' * TOTAL_STEPS}{NC}  {DIM}{TOTAL_STEPS}/{TOTAL_STEPS}  all steps done{NC}")
