@@ -7,6 +7,7 @@
   <a href="https://github.com/MozgAI/MavKa/stargazers"><img src="https://img.shields.io/github/stars/MozgAI/MavKa?color=8be9fd" alt="Stars"></a>
   <img src="https://img.shields.io/badge/macOS-Apple_Silicon%20%7C%20Intel-c0c0d0" alt="macOS">
   <img src="https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Arch%20%7C%20Debian-c0c0d0" alt="Linux">
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-c0c0d0" alt="Windows">
   <img src="https://img.shields.io/badge/install-5_min-50fa7b" alt="Install time">
   <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
 </p>
@@ -24,7 +25,7 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
+  <sub>macOS · Linux · Windows · 5 minutes · ~$2/month · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
 </p>
 
 <p align="center">
@@ -202,17 +203,36 @@ Why DeepSeek is the recommendation: **no other provider gets you a 248B model an
 
 ## Install
 
+### macOS / Linux
+
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 ```
 
-Prefer to **read the script before running it** (recommended for any `curl | bash`)?
+### Windows (native PowerShell, no WSL)
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/MozgAI/mavka/main/install.ps1 | iex"
+```
+
+Same flow, same providers, same AI-guided setup. Uses Git Bash (auto-installed via winget) for Pi Agent's shell — WSL not needed.
+
+### Prefer to read the script first? (recommended for any one-liner install)
 
 ```bash
+# macOS / Linux
 git clone https://github.com/MozgAI/mavka.git
 cd mavka
 less install.sh
 bash install.sh
+```
+
+```powershell
+# Windows
+git clone https://github.com/MozgAI/mavka.git
+cd mavka
+notepad install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 ### What the installer asks for (10 steps, ~5 minutes)
@@ -235,7 +255,13 @@ After install: open Telegram, say hi to MavKa. Done.
 ### Uninstall
 
 ```bash
+# macOS / Linux
 bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/uninstall.sh)
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/MozgAI/mavka/main/uninstall.ps1 | iex"
 ```
 
 Removes MavKa, autostart, local config. **Doesn't revoke API keys** — do that yourself on each provider.
@@ -300,14 +326,25 @@ Your computer runs a lightweight Node.js process. The heavy thinking happens in 
 
 - **macOS** — Apple Silicon & Intel
 - **Linux** — Ubuntu, Debian, Fedora, Arch, ARM
-- **Windows** — via WSL2
+- **Windows** — Windows 10 (1809+) and Windows 11, native PowerShell, no WSL needed (uses Git Bash)
 
 ## Daily Commands
 
+**macOS / Linux:**
 ```bash
 tail -f ~/mavka-bot/mavka.log      # logs
 tmux attach -t mavka               # attach to console (Ctrl+b d to detach)
 bash ~/mavka-bot/launch.sh         # restart
+```
+
+**Windows:**
+```powershell
+mavka logs        # tail logs
+mavka stop        # stop
+mavka start       # start
+mavka restart     # restart
+mavka status      # scheduled task status
+mavka uninstall   # remove autostart
 ```
 
 ## Why I Built This
