@@ -164,6 +164,18 @@ set_lang() {
       L_ai_natural="Пиши природно — задавай питання, якщо щось незрозуміло."
       L_ai_skip="Пиши 'пропустити' для необов'язкових кроків."
       L_optional="(необов'язково — пропустіть для відключення)"; L_required="обов'язкове поле"
+      L_lbl_lang="Мова"; L_lbl_provider="AI-провайдер"; L_lbl_api_key="API ключ"
+      L_tag_required="обов'язково"; L_tag_optional="необов'язково"
+      L_provider_intro="Обери мозок для бота. Можна змінити пізніше."
+      L_recommended="(рекомендується)"
+      L_p_deepseek_desc="~\$2/місяць, найдешевший"
+      L_p_chatgpt_desc="OpenAI, API ключ"
+      L_p_opus_desc="Anthropic, API ключ"
+      L_p_kimi_desc="Moonshot, API ключ. Довгий контекст"
+      L_p_groq_desc="Llama 3.3 70B, безкоштовний тариф з лімітами"
+      L_brain_of="мозок MavKa"
+      L_signup_at="Зареєструйся на"; L_create_paste="створи API ключ і встав сюди"
+      L_key_works="API ключ працює!"
       L_create_bot="Створіть бота:"
       L_botfather_url="t.me/BotFather"
       L_botfather_cmd="/newbot"
@@ -197,6 +209,18 @@ set_lang() {
       L_ai_natural="Пиши естественно — задавай вопросы, если что-то неясно."
       L_ai_skip="Пиши 'пропустить' для необязательных шагов."
       L_optional="(необязательно — пропустите для отключения)"; L_required="обязательное поле"
+      L_lbl_lang="Язык"; L_lbl_provider="AI-провайдер"; L_lbl_api_key="API ключ"
+      L_tag_required="обязательно"; L_tag_optional="необязательно"
+      L_provider_intro="Выбери мозг для бота. Можно сменить позже."
+      L_recommended="(рекомендуется)"
+      L_p_deepseek_desc="~\$2/месяц, самый дешёвый"
+      L_p_chatgpt_desc="OpenAI, API ключ"
+      L_p_opus_desc="Anthropic, API ключ"
+      L_p_kimi_desc="Moonshot, API ключ. Длинный контекст"
+      L_p_groq_desc="Llama 3.3 70B, бесплатный тариф с лимитами"
+      L_brain_of="мозг MavKa"
+      L_signup_at="Зарегистрируйся на"; L_create_paste="создай API ключ и вставь сюда"
+      L_key_works="API ключ работает!"
       L_create_bot="Создайте бота:"
       L_botfather_url="t.me/BotFather"
       L_botfather_cmd="/newbot"
@@ -230,6 +254,18 @@ set_lang() {
       L_ai_natural="Type naturally — ask questions if anything is unclear."
       L_ai_skip="Type 'skip' to skip optional steps."
       L_optional="(optional — skip to disable)"; L_required="required"
+      L_lbl_lang="Language"; L_lbl_provider="AI Provider"; L_lbl_api_key="API Key"
+      L_tag_required="required"; L_tag_optional="optional"
+      L_provider_intro="Pick the brain that powers your bot. You can switch later."
+      L_recommended="(recommended)"
+      L_p_deepseek_desc="~\$2/month, cheapest"
+      L_p_chatgpt_desc="OpenAI, API key"
+      L_p_opus_desc="Anthropic, API key"
+      L_p_kimi_desc="Moonshot, API key. Long-context"
+      L_p_groq_desc="Llama 3.3 70B, free tier with daily limits"
+      L_brain_of="MavKa's brain"
+      L_signup_at="Sign up at"; L_create_paste="create an API key and paste it here"
+      L_key_works="API key works!"
       L_create_bot="Create a bot:"
       L_botfather_url="t.me/BotFather"
       L_botfather_cmd="/newbot"
@@ -250,7 +286,7 @@ set_lang() {
 
 # ─── Collect Info ─────────────────────────────────────────────
 collect_info() {
-  # Step 1: Language
+  # Step 1: Language (label is universal — "Language" before user has picked a language)
   step_header 1 "Language" "required"
   echo -e "  🇬🇧  ${WHITE}1${NC} ${DIM}English${NC}      🇺🇦  ${WHITE}2${NC} ${DIM}Українська${NC}    🇩🇪  ${WHITE}3${NC} ${DIM}Deutsch${NC}"
   echo -e "  🇫🇷  ${WHITE}4${NC} ${DIM}Français${NC}     🇪🇸  ${WHITE}5${NC} ${DIM}Español${NC}       🇷🇺  ${WHITE}6${NC} ${DIM}Русский${NC}"
@@ -271,14 +307,14 @@ collect_info() {
   set_lang "$BOT_LANG"
 
   # Step 2: AI Provider
-  step_header 2 "AI Provider" "required"
-  echo -e "  ${DIM}Pick the brain that powers your bot. You can switch later.${NC}"
+  step_header 2 "$L_lbl_provider" "$L_tag_required"
+  echo -e "  ${DIM}$L_provider_intro${NC}"
   echo ""
-  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}     ${DIM}— ~\$2/month, cheapest${NC}  ${PURPLE}(recommended)${NC}"
-  echo -e "  ${WHITE}2${NC} ${BOLD}ChatGPT${NC}      ${DIM}— OpenAI, API key${NC}"
-  echo -e "  ${WHITE}3${NC} ${BOLD}Opus${NC}         ${DIM}— Anthropic, API key${NC}"
-  echo -e "  ${WHITE}4${NC} ${BOLD}Kimi 2.6${NC}     ${DIM}— Moonshot, API key. Long-context${NC}"
-  echo -e "  ${WHITE}5${NC} ${BOLD}Groq${NC}         ${DIM}— Llama 3.3 70B, free tier with daily limits${NC}"
+  echo -e "  ${WHITE}1${NC} ${BOLD}DeepSeek${NC}     ${DIM}— $L_p_deepseek_desc${NC}  ${PURPLE}$L_recommended${NC}"
+  echo -e "  ${WHITE}2${NC} ${BOLD}ChatGPT${NC}      ${DIM}— $L_p_chatgpt_desc${NC}"
+  echo -e "  ${WHITE}3${NC} ${BOLD}Opus${NC}         ${DIM}— $L_p_opus_desc${NC}"
+  echo -e "  ${WHITE}4${NC} ${BOLD}Kimi 2.6${NC}     ${DIM}— $L_p_kimi_desc${NC}"
+  echo -e "  ${WHITE}5${NC} ${BOLD}Groq${NC}         ${DIM}— $L_p_groq_desc${NC}"
   echo ""
 
   read -p "  ▸ " PROV_CHOICE
@@ -292,16 +328,16 @@ collect_info() {
   esac
 
   # Step 3: API Key for chosen provider
-  step_header 3 "${PROVIDER_LABEL} API Key" "required"
-  echo -e "  ${DIM}${PROVIDER_LABEL} — MavKa's brain ${NC}🍃${DIM}  —  ${PURPLE}${PROVIDER_URL}${NC}"
+  step_header 3 "${PROVIDER_LABEL} ${L_lbl_api_key}" "$L_tag_required"
+  echo -e "  ${DIM}${PROVIDER_LABEL} — ${L_brain_of} ${NC}🍃${DIM}  —  ${PURPLE}${PROVIDER_URL}${NC}"
   echo -e "  ${DIM}${PROVIDER_NOTE}${NC}"
   echo ""
 
   while true; do
-    read -p "  ${PROVIDER_LABEL} API Key: " PROVIDER_KEY
+    read -p "  ${PROVIDER_LABEL} ${L_lbl_api_key}: " PROVIDER_KEY
     [ -n "$PROVIDER_KEY" ] && break
-    echo -e "  ${RED}⚠ ${PROVIDER_LABEL} API Key — $L_required${NC}"
-    echo -e "  ${DIM}  Sign up at ${PROVIDER_URL}, create an API key, paste it here.${NC}"
+    echo -e "  ${RED}⚠ ${PROVIDER_LABEL} ${L_lbl_api_key} — $L_required${NC}"
+    echo -e "  ${DIM}  ${L_signup_at} ${PROVIDER_URL}, ${L_create_paste}.${NC}"
   done
 
   # Verify the key against the chosen provider
@@ -322,7 +358,7 @@ collect_info() {
   fi
 
   if [ "$KEY_CHECK" = "200" ]; then
-    ok "${PROVIDER_LABEL} API key works!"
+    ok "${PROVIDER_LABEL} ${L_key_works}"
     echo ""
     echo -e "  ${GREEN}${BOLD}  🍃 $L_ai_activated${NC}"
     echo -e "  ${DIM}  $L_ai_guide${NC}"
