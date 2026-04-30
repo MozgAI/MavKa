@@ -229,20 +229,38 @@ config = {
     "persona": "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. You are knowledgeable, concise, and always honest — if you don't know something, you say so."
 }
 
+CYAN = "\033[0;36m"
+BOLD = "\033[1m"
+
 def ai_print(text):
-    print(f"  {GREEN}🍃{NC} {GREY}{text}{NC}")
+    # AI message — wrap nicely without leading marker on continuation lines
+    lines = text.strip().split("\n")
+    for i, line in enumerate(lines):
+        if not line.strip():
+            print()
+            continue
+        marker = f"{GREEN}~{NC}" if i == 0 else "  "
+        print(f"  {marker} {GREY}{line.strip()}{NC}")
 
 def ai_ok(text):
-    print(f"  {GREEN}✓{NC} {GREY}{text}{NC}")
+    print(f"  {GREEN}✓{NC} {WHITE}{text}{NC}")
 
 def ai_warn(text):
     print(f"  {RED}⚠{NC} {GREY}{text}{NC}")
 
-def progress_bar(step_idx):
+def step_header(step_idx, label, required):
     total = len(STEPS)
     filled = step_idx
-    bar = f"{GREEN}{'█' * filled}{DIM}{'░' * (total - filled)}{NC}"
-    print(f"\n  {bar}  {DIM}{filled}/{total}{NC}")
+    bar = f"{GREEN}{'█' * filled}{DIM}{'·' * (total - filled)}{NC}"
+    tag = f"{DIM}required{NC}" if required else f"{DIM}optional{NC}"
+    print()
+    print(f"  {DIM}─────────────────────────────────────────────────{NC}")
+    print(f"  {bar}  {DIM}step {filled+1}/{total}{NC}  ·  {BOLD}{WHITE}{label}{NC}  {tag}")
+    print(f"  {DIM}─────────────────────────────────────────────────{NC}")
+    print()
+
+def step_done():
+    print(f"\n  {DIM}─────────────────────────────────────────────────{NC}")
 
 def call_deepseek(messages, retries=3):
     payload = json.dumps({
@@ -343,7 +361,7 @@ step_idx = 0
 
 while step_idx < len(STEPS):
     field, label, required = STEPS[step_idx]
-    progress_bar(step_idx)
+    step_header(step_idx, label, required)
 
     step_msg = f"[STEP {step_idx+1}] Ask the user for: {label}."
     if required:
@@ -362,15 +380,12 @@ while step_idx < len(STEPS):
         continue
 
     messages.append({"role": "assistant", "content": response})
-
-    for line in response.strip().split("\n"):
-        if line.strip():
-            ai_print(line.strip())
+    ai_print(response)
 
     while True:
         print()
         try:
-            user_input = input(f"  {WHITE}> {NC}")
+            user_input = input(f"  {CYAN}you ›{NC} ")
         except (EOFError, KeyboardInterrupt):
             print()
             ai_print("Setup cancelled. Run 'bash install.sh' to start again.")
@@ -383,9 +398,7 @@ while step_idx < len(STEPS):
                 resp = call_deepseek(messages)
                 if resp:
                     messages.append({"role": "assistant", "content": resp})
-                    for line in resp.strip().split("\n"):
-                        if line.strip():
-                            ai_print(line.strip())
+                    ai_print(resp)
                 continue
             else:
                 config[field] = ""
@@ -421,9 +434,7 @@ while step_idx < len(STEPS):
             resp = call_deepseek(messages)
             if resp:
                 messages.append({"role": "assistant", "content": resp})
-                for line in resp.strip().split("\n"):
-                    if line.strip():
-                        ai_print(line.strip())
+                ai_print(resp)
             continue
 
         if field == "bot_name":
@@ -438,9 +449,7 @@ while step_idx < len(STEPS):
             resp = call_deepseek(messages)
             if resp:
                 messages.append({"role": "assistant", "content": resp})
-                for line in resp.strip().split("\n"):
-                    if line.strip():
-                        ai_print(line.strip())
+                ai_print(resp)
             continue
 
         extracted = validate_input(field, user_input)
@@ -458,11 +467,12 @@ while step_idx < len(STEPS):
             resp = call_deepseek(messages)
             if resp:
                 messages.append({"role": "assistant", "content": resp})
-                for line in resp.strip().split("\n"):
-                    if line.strip():
-                        ai_print(line.strip())
+                ai_print(resp)
 
-progress_bar(len(STEPS))
+total = len(STEPS)
+print()
+print(f"  {GREEN}{'█' * total}{NC}  {DIM}{total}/{total}  all steps done{NC}")
+print(f"  {DIM}─────────────────────────────────────────────────{NC}")
 
 with open(CONFIG_FILE, "w") as f:
     json.dump(config, f)
