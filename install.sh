@@ -938,6 +938,17 @@ install_deps() {
       sudo apt-get install -y tmux 2>/dev/null || sudo yum install -y tmux 2>/dev/null || \
       sudo pacman -S --noconfirm tmux 2>/dev/null || true
     elif [ "$OS" = "mac" ]; then
+      # On a fresh Mac brew may not be installed yet — install it non-interactively
+      if ! command -v brew &>/dev/null; then
+        info "Installing Homebrew (one-time, ~1 minute)..."
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null 2>/dev/null || true
+        # Add brew to PATH for this session
+        if [ -x /opt/homebrew/bin/brew ]; then
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [ -x /usr/local/bin/brew ]; then
+          eval "$(/usr/local/bin/brew shellenv)"
+        fi
+      fi
       command -v brew &>/dev/null && brew install tmux --quiet 2>/dev/null || true
     fi
     if command -v tmux &>/dev/null; then
@@ -945,7 +956,7 @@ install_deps() {
     elif command -v screen &>/dev/null; then
       ok "screen found (fallback)"
     else
-      warn "Neither tmux nor screen found. Install: sudo apt install tmux"
+      warn "Neither tmux nor screen found — bot will run via nohup fallback."
     fi
   fi
 
@@ -1360,26 +1371,29 @@ STARTEOF
   chmod +x "$MAVKA_HOME/start.sh"
   ok "Start script created"
 
-  # ── launch.sh (tmux/screen wrapper — Pi Agent needs TTY) ──
+  # ── launch.sh (tmux/screen/nohup wrapper — Pi Agent needs TTY) ──
   cat > "$MAVKA_HOME/launch.sh" << 'LAUNCHEOF'
 #!/bin/bash
 LOGFILE="$HOME/mavka-bot/mavka.log"
 echo "$(date): Starting MavKa..." >> "$LOGFILE"
 
+# All output kept in $LOGFILE — nothing technical printed to user's terminal.
 if command -v tmux &>/dev/null; then
-  tmux kill-session -t mavka 2>/dev/null
+  tmux kill-session -t mavka 2>/dev/null || true
   sleep 1
-  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh"
+  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE"
   echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
 elif command -v screen &>/dev/null; then
-  screen -S mavka -X quit 2>/dev/null
+  screen -S mavka -X quit 2>/dev/null || true
   sleep 1
-  screen -dmS mavka bash "$HOME/mavka-bot/start.sh"
+  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" 2>>"$LOGFILE"
   echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
 else
-  echo "$(date): ERROR — neither tmux nor screen found" >> "$LOGFILE"
-  echo "Install tmux or screen: sudo apt install tmux"
-  exit 1
+  # Final fallback: nohup. No interactive attach available, but the bot runs.
+  pkill -f "mavka-bot/start.sh" 2>/dev/null || true
+  sleep 1
+  nohup bash "$HOME/mavka-bot/start.sh" >>"$LOGFILE" 2>&1 &
+  echo "$(date): MavKa launched via nohup (PID $!)" >> "$LOGFILE"
 fi
 LAUNCHEOF
   chmod +x "$MAVKA_HOME/launch.sh"
@@ -2144,6 +2158,74 @@ launch_bot() {
 
 # ─── Final ────────────────────────────────────────────────────
 show_done() {
+  # Try to extract the bot username from the token so we can show a deep link
+  BOT_LINK=""
+  if [ -f "$HOME/.pi/agent/telegram.json" ] && command -v python3 &>/dev/null; then
+    BOT_LINK=$(python3 - <<'PYBOT' 2>/dev/null || true
+import json, urllib.request, os
+try:
+    with open(os.path.expanduser("~/.pi/agent/telegram.json")) as f:
+        cfg = json.load(f)
+    token = cfg.get("botToken", "")
+    if not token: raise SystemExit
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/getMe", method="GET")
+    with urllib.request.urlopen(req, timeout=5) as r:
+        d = json.load(r)
+    username = d.get("result", {}).get("username", "")
+    if username:
+        print(f"https://t.me/{username}")
+except Exception:
+    pass
+PYBOT
+)
+  fi
+
+  # Localized "next steps" banner — large, can't miss
+  case "$BOT_LANG" in
+    ru)
+      L_open_tg="ОТКРОЙ TELEGRAM"
+      L_step_a="Найди своего бота:"
+      L_step_b="Напиши ему: \"Привет\""
+      L_step_c="Бот ответит в Telegram. НЕ в этом терминале."
+      L_link_label="Прямая ссылка на бота:"
+      ;;
+    uk)
+      L_open_tg="ВІДКРИЙ TELEGRAM"
+      L_step_a="Знайди свого бота:"
+      L_step_b="Напиши йому: \"Привіт\""
+      L_step_c="Бот відповість у Telegram. НЕ в цьому терміналі."
+      L_link_label="Пряме посилання на бота:"
+      ;;
+    de)
+      L_open_tg="ÖFFNE TELEGRAM"
+      L_step_a="Finde deinen Bot:"
+      L_step_b="Schreibe ihm: \"Hallo\""
+      L_step_c="Der Bot antwortet in Telegram, NICHT in diesem Terminal."
+      L_link_label="Direkter Link zum Bot:"
+      ;;
+    fr)
+      L_open_tg="OUVRE TELEGRAM"
+      L_step_a="Trouve ton bot :"
+      L_step_b="Écris-lui : \"Salut\""
+      L_step_c="Le bot répondra dans Telegram, PAS dans ce terminal."
+      L_link_label="Lien direct vers le bot :"
+      ;;
+    es)
+      L_open_tg="ABRE TELEGRAM"
+      L_step_a="Encuentra tu bot:"
+      L_step_b="Escríbele: \"Hola\""
+      L_step_c="El bot responderá en Telegram, NO en este terminal."
+      L_link_label="Enlace directo al bot:"
+      ;;
+    *)
+      L_open_tg="OPEN TELEGRAM NOW"
+      L_step_a="Find your bot:"
+      L_step_b="Write to it: \"Hi\""
+      L_step_c="The bot replies in Telegram. NOT in this terminal."
+      L_link_label="Direct link to the bot:"
+      ;;
+  esac
+
   echo ""
   echo -e "${GREEN}"
   echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗ '
@@ -2154,23 +2236,30 @@ show_done() {
   echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═╝'
   echo -e "${NC}"
   echo -e "          ${GREEN}🍃 $L_is_ready${NC}"
-  echo -e "          ${WHITE}$L_say_hi${NC}"
+  echo ""
+  echo -e "  ${YELLOW}┌────────────────────────────────────────────────────────────┐${NC}"
+  echo -e "  ${YELLOW}│${NC}  ${BOLD}${WHITE}📱  $L_open_tg${NC}                                       ${YELLOW}│${NC}"
+  echo -e "  ${YELLOW}│${NC}                                                            ${YELLOW}│${NC}"
+  echo -e "  ${YELLOW}│${NC}  ${WHITE}1.${NC} ${GREY}$L_step_a${NC}                                          ${YELLOW}│${NC}"
+  if [ -n "$BOT_LINK" ]; then
+    PADLEN=$((54 - ${#BOT_LINK}))
+    PAD=""
+    for ((i=0; i<PADLEN; i++)); do PAD="${PAD} "; done
+    echo -e "  ${YELLOW}│${NC}     ${PURPLE}$BOT_LINK${NC}${PAD}${YELLOW}│${NC}"
+  fi
+  echo -e "  ${YELLOW}│${NC}  ${WHITE}2.${NC} ${GREY}$L_step_b${NC}                                          ${YELLOW}│${NC}"
+  echo -e "  ${YELLOW}│${NC}  ${WHITE}3.${NC} ${GREY}$L_step_c${NC}     ${YELLOW}│${NC}"
+  echo -e "  ${YELLOW}└────────────────────────────────────────────────────────────┘${NC}"
   echo ""
   echo -e "  ${DIM}──────────────────────────────────────────${NC}"
   echo ""
-  echo -e "  ${WHITE}Useful commands:${NC}"
-  echo -e "  ${DIM}  View logs:      ${GREY}tail -f ~/mavka-bot/mavka.log${NC}"
-  echo -e "  ${DIM}  Attach console: ${GREY}tmux attach -t mavka${NC}"
-  echo -e "  ${DIM}  Restart:        ${GREY}bash ~/mavka-bot/launch.sh${NC}"
-  echo -e "  ${DIM}  Apply patches:  ${GREY}bash ~/mavka-bot/patch.sh${NC}"
+  echo -e "  ${DIM}Logs:    tail -f ~/mavka-bot/mavka.log${NC}"
+  echo -e "  ${DIM}Restart: bash ~/mavka-bot/launch.sh${NC}"
   if [ "$OS" = "mac" ]; then
-    echo -e "  ${DIM}  Stop:           ${GREY}launchctl unload ~/Library/LaunchAgents/com.mavka.bot.plist${NC}"
+    echo -e "  ${DIM}Stop:    launchctl unload ~/Library/LaunchAgents/com.mavka.bot.plist${NC}"
   else
-    echo -e "  ${DIM}  Stop:           ${GREY}systemctl --user stop mavka${NC}"
+    echo -e "  ${DIM}Stop:    systemctl --user stop mavka${NC}"
   fi
-  echo ""
-  echo -e "  ${DIM}Cost: ~\$0.10-0.50/month with DeepSeek V4 Flash${NC}"
-  echo -e "  ${DIM}Home: ~/mavka-bot/${NC}"
   echo ""
 }
 
