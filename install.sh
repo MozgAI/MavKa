@@ -636,7 +636,7 @@ STEPS:
 4. telegram_token — Telegram Bot Token. REQUIRED. How to get it: open Telegram, search for @BotFather, send /newbot, choose a name and username, copy the token (format: 1234567890:AAH...).
 5. telegram_id — Telegram numeric user ID. REQUIRED. How to get it: open Telegram, search for @userinfobot, send /start, copy the number.
 6. bot_name — Name for the bot. Default: MavKa.
-7. persona — Bot personality. Offer choices: (1) Smart assistant (2) Nutritionist (3) Chef (4) Language tutor (5) Custom description.
+7. persona — Bot personality. ASK FREEFORM, not a numbered menu. Phrase it like: "What role do you want me to play? Describe me — your assistant for what? E.g. 'Be my personal coach', 'Help me with English and recipes', 'Be a study buddy for my kid'. Whatever you write becomes my personality." Accept ANY description ≥ 10 chars as the answer. The bot will save the user's reply directly as its persona. If the user writes something very short (≤9 chars) or asks a question, ask them to elaborate.
 
 CONVERSATION RULES — VERY IMPORTANT:
 - The installer (not you) decides when to advance. You signal intent via a control tag at the end of every reply.
@@ -720,22 +720,20 @@ while step_idx < len(STEPS):
 
         choice = user_input.strip()
 
-        # Hard-coded value handlers for persona / bot_name (numeric/short-text answers)
+        # Persona — accept any non-trivial freeform description as the answer.
+        # The user's own words become the bot's personality, no menu, no presets.
+        # Short replies (≤9 chars) or questions fall through to AI for clarification.
         if field == "persona":
-            persona_map = {
-                "1": "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. Knowledgeable, concise, always honest.",
-                "2": "an expert nutritionist and fitness coach. You analyze meals, count calories, create meal plans and workouts. Motivating and science-based.",
-                "3": "a professional chef and recipe expert. You suggest recipes, explain techniques clearly, and make cooking fun.",
-                "4": "a patient language tutor. You help learn languages through conversation, correct mistakes gently, and adapt to the learner's level.",
-            }
-            if choice in persona_map:
-                config["persona"] = persona_map[choice]
+            is_question = "?" in choice or choice.lower().startswith((
+                "how", "what", "why", "where", "can ", "could ",
+                "как", "что", "почему", "где", "можешь",
+                "як", "що", "чому", "де"
+            ))
+            if not is_question and len(choice) >= 10:
+                config["persona"] = choice
                 ai_ok("Personality set!")
                 step_idx += 1
                 break
-            if choice == "5":
-                # Custom — let AI follow up by asking for description, stay
-                pass
 
         # Ask the AI to interpret intent for everything we couldn't classify locally
         messages.append({"role": "user", "content": user_input})
@@ -1379,14 +1377,16 @@ echo "$(date): Starting MavKa..." >> "$LOGFILE"
 
 # All output kept in $LOGFILE — nothing technical printed to user's terminal.
 if command -v tmux &>/dev/null; then
-  tmux kill-session -t mavka 2>/dev/null || true
+  tmux kill-session -t mavka >/dev/null 2>&1 || true
   sleep 1
-  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE"
+  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" >/dev/null 2>>"$LOGFILE" || true
   echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
 elif command -v screen &>/dev/null; then
-  screen -S mavka -X quit 2>/dev/null || true
+  # macOS screen prints "No screen session found" to STDOUT (not stderr) when
+  # there's nothing to kill — redirect both streams.
+  screen -S mavka -X quit >/dev/null 2>&1 || true
   sleep 1
-  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" 2>>"$LOGFILE"
+  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" >/dev/null 2>&1 || true
   echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
 else
   # Final fallback: nohup. No interactive attach available, but the bot runs.
@@ -2121,22 +2121,22 @@ first_run() {
     sleep 1
     tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh"
   elif command -v screen &>/dev/null; then
-    screen -S mavka -X quit 2>/dev/null
+    screen -S mavka -X quit >/dev/null 2>&1 || true
     sleep 1
-    screen -dmS mavka bash "$MAVKA_HOME/start.sh"
+    screen -dmS mavka bash "$MAVKA_HOME/start.sh" >/dev/null 2>&1 || true
   fi
 
   for i in $(seq 1 60); do
     if [ -f "$PI_TG" ]; then
       ok "pi-telegram downloaded"
-      tmux kill-session -t mavka 2>/dev/null || screen -S mavka -X quit 2>/dev/null
+      tmux kill-session -t mavka >/dev/null 2>&1 || screen -S mavka -X quit >/dev/null 2>&1 || true
       sleep 2
       return 0
     fi
     sleep 2
   done
 
-  tmux kill-session -t mavka 2>/dev/null || screen -S mavka -X quit 2>/dev/null
+  tmux kill-session -t mavka >/dev/null 2>&1 || screen -S mavka -X quit >/dev/null 2>&1 || true
   warn "pi-telegram download timed out. Run 'bash ~/mavka-bot/patch.sh' after first manual start."
   return 1
 }
@@ -2149,7 +2149,7 @@ launch_bot() {
   sleep 3
 
   if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
-     (screen -ls 2>/dev/null | grep -q mavka); then
+     (screen -ls >/dev/null 2>&1 && screen -ls 2>&1 | grep -q mavka); then
     ok "${BOT_NAME} is running!"
   else
     warn "${BOT_NAME} may need a moment to start. Check: tmux attach -t mavka"
