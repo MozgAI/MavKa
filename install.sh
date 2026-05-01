@@ -566,7 +566,9 @@ def validate_input(field, value):
         m = re.search(r'(AI[A-Za-z0-9_-]{30,})', v)
         return m.group(1) if m else None
     elif field == "tavily_key":
-        m = re.search(r'(tvly-[A-Za-z0-9]{10,})', v)
+        # Tavily keys: tvly-XXX (legacy), tvly-dev-XXX, tvly-prod-XXX (current).
+        # Payload may contain dashes/underscores, so allow them in the token.
+        m = re.search(r'(tvly-[A-Za-z0-9_-]{10,})', v)
         return m.group(1) if m else None
     elif field == "telegram_token":
         m = re.search(r'(\d{8,}:[A-Za-z0-9_-]{30,})', v)
