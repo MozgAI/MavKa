@@ -356,6 +356,7 @@ Your computer runs a lightweight Node.js process. The heavy thinking happens in 
 - **macOS** — Apple Silicon & Intel
 - **Linux** — Ubuntu, Debian, Fedora, Arch, ARM
 - **Windows** — Windows 10 (1809+) and Windows 11, native PowerShell, no WSL needed (uses Git Bash). *Beta — please report bugs.*
+- **No computer at all? → [Mavka Light](mavka-light/)** — runs on Fly.io free cloud, $0/month. For people who want a Telegram AI bot without owning a Mac/Linux/Windows machine.
 
 ## Daily Commands
 

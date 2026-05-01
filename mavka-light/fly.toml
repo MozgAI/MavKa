@@ -1,0 +1,43 @@
+# Mavka Light — Fly.io app config
+# Deploy:
+#   flyctl launch --no-deploy            # creates app + volume
+#   flyctl secrets set TELEGRAM_BOT_TOKEN=... TELEGRAM_USER_ID=... GROQ_API_KEY=...
+#   flyctl deploy
+
+app = "mavka-light"        # rename per user
+primary_region = "ord"      # closest free region for North America; users in EU pick "fra", APAC "sin"
+
+[build]
+
+[env]
+  # Defaults — secrets are injected at deploy time via `flyctl secrets set`
+  PROVIDER = "groq"
+  MODEL = "llama-3.3-70b-versatile"
+  BOT_NAME = "MavKa"
+  PERSONA = "a smart, proactive, and friendly AI assistant. You help with any questions: research, writing, planning, coding, analysis. Knowledgeable, concise, always honest — if you don't know something, you say so."
+  BOT_LANG = "en"
+
+[mounts]
+  # Persistent memory and history. Free-tier volume ≤ 3 GB.
+  source = "mavka_data"
+  destination = "/home/mavka/mavka-bot"
+  initial_size = "1gb"
+
+[[vm]]
+  # Smallest tier that fits Pi Agent (~150-200 MB RSS once warm).
+  # If you start hitting OOM, bump to 512mb (~$2/month).
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1
+
+# No HTTP service — Mavka talks only outbound (to Telegram + LLM APIs)
+# So no [http_service] block, no public ports, no health checks needed.
+[checks]
+  # Liveness: ensure the pi process is alive every 5 minutes.
+  # If it crashed, Fly.io restarts the VM automatically.
+  [checks.process]
+    type = "tcp"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+    port = 9999  # entrypoint.sh opens a dummy listener on 9999 so this check passes
