@@ -1386,7 +1386,7 @@ if command -v tmux &>/dev/null; then
 elif command -v screen &>/dev/null; then
   # macOS screen prints "No screen session found" to STDOUT (not stderr) when
   # there's nothing to kill — redirect both streams.
-  screen -S mavka -X quit >/dev/null 2>&1 || true
+  { screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   sleep 1
   screen -dmS mavka bash "$HOME/mavka-bot/start.sh" >/dev/null 2>&1 || true
   echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
@@ -2123,7 +2123,7 @@ first_run() {
     sleep 1
     tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh"
   elif command -v screen &>/dev/null; then
-    screen -S mavka -X quit >/dev/null 2>&1 || true
+    { screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
     sleep 1
     screen -dmS mavka bash "$MAVKA_HOME/start.sh" >/dev/null 2>&1 || true
   fi
@@ -2131,14 +2131,14 @@ first_run() {
   for i in $(seq 1 60); do
     if [ -f "$PI_TG" ]; then
       ok "pi-telegram downloaded"
-      tmux kill-session -t mavka >/dev/null 2>&1 || screen -S mavka -X quit >/dev/null 2>&1 || true
+      { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
       sleep 2
       return 0
     fi
     sleep 2
   done
 
-  tmux kill-session -t mavka >/dev/null 2>&1 || screen -S mavka -X quit >/dev/null 2>&1 || true
+  { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   warn "pi-telegram download timed out. Run 'bash ~/mavka-bot/patch.sh' after first manual start."
   return 1
 }
