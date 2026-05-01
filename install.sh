@@ -2158,10 +2158,15 @@ launch_bot() {
 
 # ─── Final ────────────────────────────────────────────────────
 show_done() {
+  # Clear the screen so the final banner is the only thing the user sees.
+  # Avoids the situation where the user scrolls past it into a fresh shell prompt.
+  clear 2>/dev/null || true
+
   # Try to extract the bot username from the token so we can show a deep link
   BOT_LINK=""
+  BOT_USERNAME=""
   if [ -f "$HOME/.pi/agent/telegram.json" ] && command -v python3 &>/dev/null; then
-    BOT_LINK=$(python3 - <<'PYBOT' 2>/dev/null || true
+    BOT_USERNAME=$(python3 - <<'PYBOT' 2>/dev/null || true
 import json, urllib.request, os
 try:
     with open(os.path.expanduser("~/.pi/agent/telegram.json")) as f:
@@ -2173,11 +2178,12 @@ try:
         d = json.load(r)
     username = d.get("result", {}).get("username", "")
     if username:
-        print(f"https://t.me/{username}")
+        print(username)
 except Exception:
     pass
 PYBOT
 )
+    [ -n "$BOT_USERNAME" ] && BOT_LINK="https://t.me/$BOT_USERNAME"
   fi
 
   # Localized "next steps" banner — large, can't miss
@@ -2237,21 +2243,18 @@ PYBOT
   echo -e "${NC}"
   echo -e "          ${GREEN}🍃 $L_is_ready${NC}"
   echo ""
-  echo -e "  ${YELLOW}┌────────────────────────────────────────────────────────────┐${NC}"
-  echo -e "  ${YELLOW}│${NC}  ${BOLD}${WHITE}📱  $L_open_tg${NC}                                       ${YELLOW}│${NC}"
-  echo -e "  ${YELLOW}│${NC}                                                            ${YELLOW}│${NC}"
-  echo -e "  ${YELLOW}│${NC}  ${WHITE}1.${NC} ${GREY}$L_step_a${NC}                                          ${YELLOW}│${NC}"
-  if [ -n "$BOT_LINK" ]; then
-    PADLEN=$((54 - ${#BOT_LINK}))
-    PAD=""
-    for ((i=0; i<PADLEN; i++)); do PAD="${PAD} "; done
-    echo -e "  ${YELLOW}│${NC}     ${PURPLE}$BOT_LINK${NC}${PAD}${YELLOW}│${NC}"
-  fi
-  echo -e "  ${YELLOW}│${NC}  ${WHITE}2.${NC} ${GREY}$L_step_b${NC}                                          ${YELLOW}│${NC}"
-  echo -e "  ${YELLOW}│${NC}  ${WHITE}3.${NC} ${GREY}$L_step_c${NC}     ${YELLOW}│${NC}"
-  echo -e "  ${YELLOW}└────────────────────────────────────────────────────────────┘${NC}"
+  echo "════════════════════════════════════════════════════════════"
   echo ""
-  echo -e "  ${DIM}──────────────────────────────────────────${NC}"
+  echo -e "          ${BOLD}${WHITE}📱  $L_open_tg${NC}"
+  echo ""
+  echo -e "  ${WHITE}1.${NC} $L_step_a"
+  if [ -n "$BOT_LINK" ]; then
+    echo -e "     ${PURPLE}${BOLD}$BOT_LINK${NC}"
+  fi
+  echo -e "  ${WHITE}2.${NC} $L_step_b"
+  echo -e "  ${WHITE}3.${NC} $L_step_c"
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
   echo ""
   echo -e "  ${DIM}Logs:    tail -f ~/mavka-bot/mavka.log${NC}"
   echo -e "  ${DIM}Restart: bash ~/mavka-bot/launch.sh${NC}"
@@ -2261,6 +2264,24 @@ PYBOT
     echo -e "  ${DIM}Stop:    systemctl --user stop mavka${NC}"
   fi
   echo ""
+
+  # Pause so the user actually sees the final screen and clicks the link
+  # before being dropped back to a shell prompt where they might start typing.
+  echo ""
+  case "$BOT_LANG" in
+    ru) PRESS_ENTER="Нажми Enter чтобы закрыть установщик и перейти в Telegram..." ;;
+    uk) PRESS_ENTER="Натисни Enter, щоб закрити установник і перейти в Telegram..." ;;
+    de) PRESS_ENTER="Drücke Enter, um das Installationsprogramm zu schließen und zu Telegram zu wechseln..." ;;
+    fr) PRESS_ENTER="Appuie sur Entrée pour fermer l'installateur et ouvrir Telegram..." ;;
+    es) PRESS_ENTER="Pulsa Enter para cerrar el instalador y abrir Telegram..." ;;
+    *)  PRESS_ENTER="Press Enter to close the installer and open Telegram..." ;;
+  esac
+  read -p "  $PRESS_ENTER " _ </dev/tty 2>/dev/null || sleep 5
+
+  # On macOS, try to actually open the bot in Telegram for the user.
+  if [ "$OS" = "mac" ] && [ -n "$BOT_LINK" ]; then
+    open "$BOT_LINK" 2>/dev/null || true
+  fi
 }
 
 # ─── Main ─────────────────────────────────────────────────────
