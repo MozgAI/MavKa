@@ -616,7 +616,7 @@ def validate_input(field, value):
     if not v: return None
     if   field == "groq_key":      m = re.search(r'(gsk_[A-Za-z0-9]{20,})', v); return m.group(1) if m else None
     elif field == "gemini_key":    m = re.search(r'(AI[A-Za-z0-9_-]{30,})', v); return m.group(1) if m else None
-    elif field == "tavily_key":    m = re.search(r'(tvly-[A-Za-z0-9]{10,})', v); return m.group(1) if m else None
+    elif field == "tavily_key":    m = re.search(r'(tvly-[A-Za-z0-9_-]{10,})', v); return m.group(1) if m else None
     elif field == "telegram_token":m = re.search(r'(\d{8,}:[A-Za-z0-9_-]{30,})', v); return m.group(1) if m else None
     elif field == "telegram_id":   m = re.fullmatch(r'\s*(\d{5,12})\s*\.?', v); return m.group(1) if m else None
     elif field == "bot_name":      return v if (len(v) <= 30 and "?" not in v and "!" not in v) else None

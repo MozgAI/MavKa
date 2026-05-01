@@ -12,6 +12,21 @@
 # Requires: internet connection
 set -e
 
+# Helpful Ctrl+C / unexpected-exit message: tell the user the install is partial
+# and re-running converges to a good state.
+on_interrupt() {
+  echo ""
+  echo ""
+  echo "  ⚠  Установка прервана / Installation interrupted."
+  echo "     Просто запусти ту же команду заново — установщик идемпотентен:"
+  echo "     Just run the same command again — the installer is idempotent:"
+  echo ""
+  echo "       bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)"
+  echo ""
+  exit 130
+}
+trap on_interrupt INT TERM
+
 # ─── Colors ───────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -1318,18 +1333,33 @@ IDENTITYEOF
   ok "Identity created"
 
   # ── start.sh ──
-  NODE_PATH="$(which node 2>/dev/null || echo '$HOME/.nvm/versions/node/v22.22.2/bin')"
-  NODE_DIR="$(dirname "$NODE_PATH")"
-  PI_PATH="$(which pi 2>/dev/null || echo "${NODE_DIR}/pi")"
+  # Resolve node and pi paths NOW so the autostart entry doesn't depend on
+  # an nvm version that may change. Bake absolute paths into the script.
+  NODE_BIN="$(command -v node)"
+  NODE_DIR="$(dirname "$NODE_BIN")"
+  # Map provider name → canonical env var name the rest of the toolchain uses
+  case "${PROVIDER_NAME:-deepseek}" in
+    deepseek)    PROVIDER_KEY_VAR="DEEPSEEK_API_KEY" ;;
+    openai)      PROVIDER_KEY_VAR="OPENAI_API_KEY" ;;
+    anthropic)   PROVIDER_KEY_VAR="ANTHROPIC_API_KEY" ;;
+    moonshotai)  PROVIDER_KEY_VAR="MOONSHOT_API_KEY" ;;
+    groq)        PROVIDER_KEY_VAR="GROQ_API_KEY" ;;
+    *)           PROVIDER_KEY_VAR="DEEPSEEK_API_KEY" ;;
+  esac
+  CHOSEN_LLM_KEY="${PROVIDER_KEY:-$DEEPSEEK_KEY}"
 
   cat > "$MAVKA_HOME/start.sh" << STARTEOF
 #!/bin/bash
 export HOME="$HOME"
+# Hardcode the resolved node bin dir so this survives nvm version bumps.
+export PATH="${NODE_DIR}:\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\$PATH"
+# Re-source nvm if present (covers manual node updates without breaking us)
 export NVM_DIR="\$HOME/.nvm"
 [ -s "\$NVM_DIR/nvm.sh" ] && . "\$NVM_DIR/nvm.sh"
-export VOLTA_HOME="\$HOME/.volta"
-export PATH="\$VOLTA_HOME/bin:\$HOME/.nvm/versions/node/\$(ls \$HOME/.nvm/versions/node/ 2>/dev/null | tail -1)/bin:\$HOME/.local/bin:\$PATH"
-export DEEPSEEK_API_KEY="${DEEPSEEK_KEY}"
+
+# Provider key under the canonical env var name (DEEPSEEK_API_KEY / OPENAI_API_KEY / etc)
+export ${PROVIDER_KEY_VAR}="${CHOSEN_LLM_KEY}"
+# Tool keys (independent of LLM provider)
 export GROQ_API_KEY="${GROQ_KEY}"
 export GEMINI_API_KEY="${GEMINI_KEY}"
 export TAVILY_API_KEY="${TAVILY_KEY}"
@@ -1386,7 +1416,7 @@ if command -v tmux &>/dev/null; then
 elif command -v screen &>/dev/null; then
   # macOS screen prints "No screen session found" to STDOUT (not stderr) when
   # there's nothing to kill — redirect both streams.
-  { screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
+  { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   sleep 1
   screen -dmS mavka bash "$HOME/mavka-bot/start.sh" >/dev/null 2>&1 || true
   echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
@@ -1409,9 +1439,21 @@ TAVILY_KEY="${TAVILY_API_KEY}"
 [ -z "$QUERY" ] && { echo "Usage: search.sh \"query\" [max]"; exit 1; }
 [ -z "$TAVILY_KEY" ] && { echo "Error: TAVILY_API_KEY not set"; exit 1; }
 
+# Build JSON via python so quotes/backslashes/newlines in $QUERY are escaped properly
+PAYLOAD=$(TAVILY_KEY="$TAVILY_KEY" QUERY="$QUERY" MAX="$MAX" python3 - <<'PYEOF'
+import json, os
+print(json.dumps({
+    "api_key": os.environ["TAVILY_KEY"],
+    "query":   os.environ["QUERY"],
+    "search_depth": "advanced",
+    "include_answer": True,
+    "max_results": int(os.environ.get("MAX", "5")),
+}))
+PYEOF
+)
 RESULT=$(curl -s -X POST "https://api.tavily.com/search" \
   -H "Content-Type: application/json" \
-  -d "{\"api_key\":\"$TAVILY_KEY\",\"query\":\"$QUERY\",\"search_depth\":\"advanced\",\"include_answer\":true,\"max_results\":$MAX}" 2>/dev/null)
+  -d "$PAYLOAD" 2>/dev/null)
 
 if echo "$RESULT" | python3 -c "import sys,json;d=json.load(sys.stdin);exit(0 if d.get('results') else 1)" 2>/dev/null; then
   echo "$RESULT" | python3 -c "
@@ -1524,13 +1566,26 @@ PYEOF
     ;;
 esac
 
-# Restart the bot so the new key takes effect
+# Restart the bot so the new key takes effect.
+# Kill EVERY copy of the agent, not just one tmux session — old pi processes
+# cache auth.json in memory and would keep using the old key otherwise.
 echo "Restarting MavKa..."
-if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
-  tmux kill-session -t mavka
-  sleep 1
+tmux kill-session -t mavka >/dev/null 2>&1 || true
+screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1 || true
+screen -wipe >/dev/null 2>&1 || true
+pkill -f 'mavka-bot/start\.sh' >/dev/null 2>&1 || true
+pkill -f 'pi --provider'      >/dev/null 2>&1 || true
+sleep 2
+
+# Prefer the autostart unit (it survived reboots; wins over manual launch)
+if launchctl list 2>/dev/null | grep -q com.mavka.bot; then
+  launchctl kickstart -k "gui/$UID/com.mavka.bot" >/dev/null 2>&1 || true
+elif systemctl --user is-active mavka >/dev/null 2>&1; then
+  systemctl --user restart mavka >/dev/null 2>&1 || true
+elif [ -x "$HOME/mavka-bot/launch.sh" ]; then
+  bash "$HOME/mavka-bot/launch.sh" &>/dev/null &
 fi
-[ -x "$HOME/mavka-bot/launch.sh" ] && bash "$HOME/mavka-bot/launch.sh" &>/dev/null &
+
 echo "✓ MavKa restarted. New key is live."
 SETKEYEOF
   chmod +x "$MAVKA_HOME/setkey.sh"
@@ -2072,7 +2127,7 @@ setup_autostart() {
         <key>HOME</key>
         <string>${HOME}</string>
         <key>PATH</key>
-        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${HOME}/.nvm/versions/node/v22.22.2/bin:${HOME}/.local/bin:${HOME}/Library/Python/3.9/bin</string>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${NODE_DIR}:${HOME}/.local/bin</string>
     </dict>
 </dict>
 </plist>
@@ -2097,7 +2152,7 @@ ExecStart=/bin/bash ${HOME}/mavka-bot/launch.sh
 Restart=on-failure
 RestartSec=10
 Environment=HOME=${HOME}
-Environment=PATH=/usr/local/bin:/usr/bin:/bin:${HOME}/.nvm/versions/node/v22.22.2/bin:${HOME}/.local/bin
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:${NODE_DIR}:${HOME}/.local/bin
 
 [Install]
 WantedBy=default.target
@@ -2123,7 +2178,7 @@ first_run() {
     sleep 1
     tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh"
   elif command -v screen &>/dev/null; then
-    { screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
+    { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
     sleep 1
     screen -dmS mavka bash "$MAVKA_HOME/start.sh" >/dev/null 2>&1 || true
   fi
@@ -2131,19 +2186,89 @@ first_run() {
   for i in $(seq 1 60); do
     if [ -f "$PI_TG" ]; then
       ok "pi-telegram downloaded"
-      { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
+      { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
       sleep 2
       return 0
     fi
     sleep 2
   done
 
-  { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/[0-9]+\.mavka/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
+  { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   warn "pi-telegram download timed out. Run 'bash ~/mavka-bot/patch.sh' after first manual start."
   return 1
 }
 
 # ─── Launch ───────────────────────────────────────────────────
+verify_telegram() {
+  # Active sanity check: validate the Telegram token + user ID combination
+  # *before* we wait for Pi to start. If the token is wrong, we say so now.
+  # If the token is right but the user hasn't tapped /start in Telegram yet,
+  # we tell them clearly instead of letting messages go silently into a void
+  # (the "Olesya's wife" failure mode).
+  step "Verifying Telegram setup..."
+  TG_VERIFY=$(TG_TOKEN_E="$TG_TOKEN" TG_UID_E="$TG_USER_ID" python3 - <<'PYEOF' 2>/dev/null || echo "ERR"
+import json, urllib.request, urllib.error, os
+token = os.environ.get("TG_TOKEN_E", "")
+uid   = os.environ.get("TG_UID_E", "")
+if not token or not uid:
+    print("ERR_EMPTY"); raise SystemExit
+# 1. getMe — token valid?
+try:
+    with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=8) as r:
+        me = json.load(r)
+    username = me.get("result", {}).get("username", "")
+    if not username:
+        print("ERR_TOKEN"); raise SystemExit
+except Exception:
+    print("ERR_TOKEN"); raise SystemExit
+# 2. sendMessage probe — does the user actually have a chat with this bot?
+body = json.dumps({"chat_id": int(uid), "text": "🍃 Setup almost done…"}).encode()
+req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
+                             data=body, headers={"Content-Type":"application/json"})
+try:
+    with urllib.request.urlopen(req, timeout=8) as r:
+        json.load(r)
+    print(f"OK:{username}")
+except urllib.error.HTTPError as e:
+    err = ""
+    try:
+        err = json.load(e).get("description", "")
+    except Exception:
+        pass
+    if "chat not found" in err.lower() or "blocked" in err.lower() or e.code == 403:
+        print(f"ERR_NEED_START:{username}")
+    else:
+        print(f"ERR_API:{e.code}:{err[:80]}")
+except Exception as e:
+    print(f"ERR_NET:{e}")
+PYEOF
+)
+  case "$TG_VERIFY" in
+    OK:*)
+      USERNAME="${TG_VERIFY#OK:}"
+      ok "Telegram OK — bot @${USERNAME} can DM you"
+      ;;
+    ERR_NEED_START:*)
+      USERNAME="${TG_VERIFY#ERR_NEED_START:}"
+      echo ""
+      echo "  ${YELLOW}⚠  Telegram bot is not started yet.${NC}"
+      echo "     Open Telegram, find ${PURPLE}@${USERNAME}${NC} and tap ${WHITE}START${NC}."
+      echo "     URL: ${PURPLE}https://t.me/${USERNAME}${NC}"
+      echo "     After that, the bot will work — no need to re-run this installer."
+      echo ""
+      ;;
+    ERR_TOKEN)
+      fail "Telegram bot token is invalid. Re-run the installer and paste the token from @BotFather again."
+      ;;
+    ERR_EMPTY)
+      fail "Telegram token or user ID is empty. Re-run the installer."
+      ;;
+    *)
+      warn "Could not verify Telegram setup ($TG_VERIFY). The bot may still work."
+      ;;
+  esac
+}
+
 launch_bot() {
   step "Launching ${BOT_NAME}..."
 
@@ -2294,6 +2419,7 @@ main() {
   install_deps
   create_files
   configure_pi
+  verify_telegram
   first_run
   patch_telegram
   setup_autostart

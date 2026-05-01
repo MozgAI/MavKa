@@ -118,8 +118,8 @@ for f in "$MAVKA_HOME/memory/user_profile.md" "$MAVKA_HOME/memory/feedback_"*.md
 done
 
 # ─── TCP keepalive socket on :9999 for Fly.io health check ────────
-# Tiny background netcat-style listener so flyctl checks pass without HTTP.
-( while true; do (echo -n "ok" | nc -l -p 9999 -q 1 2>/dev/null) || sleep 5; done ) &
+# socat works identically across alpine / debian (busybox nc flags differ).
+socat -d TCP-LISTEN:9999,reuseaddr,fork SYSTEM:'echo ok' >/dev/null 2>&1 &
 
 # Export tool keys (search.sh / tts.sh / etc would read these if installed)
 export GROQ_API_KEY="$GROQ_API_KEY"

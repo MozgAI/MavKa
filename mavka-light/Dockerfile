@@ -5,7 +5,8 @@ FROM node:22-alpine
 # tini = proper PID 1 (so SIGTERM from Fly stops gracefully)
 # tmux = optional, kept off here (we run pi in foreground)
 # git = needed by pi to fetch its extensions on first run
-RUN apk add --no-cache tini git curl python3 py3-pip ca-certificates
+# socat: predictable health-check listener (busybox nc has flag mismatches)
+RUN apk add --no-cache tini git curl python3 py3-pip ca-certificates socat
 
 # Install Pi Coding Agent globally
 RUN npm install -g @mariozechner/pi-coding-agent && \
