@@ -9,12 +9,12 @@
   <img src="https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Arch%20%7C%20Debian-c0c0d0" alt="Linux">
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011%20(beta)-ffb86c" alt="Windows beta">
   <img src="https://img.shields.io/badge/install-5_min-50fa7b" alt="Install time">
-  <img src="https://img.shields.io/badge/cost-~%240.05%2Fmonth-bd93f9" alt="Cost">
+  <img src="https://img.shields.io/badge/cost-~%242%2Fmonth-bd93f9" alt="Cost">
 </p>
 
 <h2 align="center">The ChatGPT killer. The OpenClaw killer.<br>The easiest way into vibecoding ever shipped.</h2>
 
-<h3 align="center">Your own AI. In Telegram. Coding agent on your laptop.<br>One install. $2 buys you a year. No limits. No lock-in.</h3>
+<h3 align="center">Your own AI. In Telegram. Coding agent on your laptop.<br>One install. ~$2/month on DeepSeek. No limits. No lock-in.</h3>
 
 <p align="center">
 
@@ -25,7 +25,7 @@ bash <(curl -sL https://raw.githubusercontent.com/MozgAI/mavka/main/install.sh)
 </p>
 
 <p align="center">
-  <sub>macOS · Linux · Windows · 5 minutes · $2 starter credit lasts ~1 year · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
+  <sub>macOS · Linux · Windows · 5 minutes · ~$2/month on DeepSeek · 5 AI providers · hands-free voice · AI installs itself · MIT</sub>
 </p>
 
 <p align="center">
@@ -48,19 +48,19 @@ Then DeepSeek shipped **V4 Flash** — a **248-billion-parameter** model at **$0
 
 Read that price again.
 
-A $10,000 home server **cannot physically run a 248B model.** I'd be stuck with something half the size, half the quality. Meanwhile, the money I'd spend on hardware would cover **20 years of nonstop, heavy-duty AI usage** on the API. **Twenty years.** And that's at intensive coding rates — for casual daily-driver chat, you're looking at centuries.
+A $10,000 home server **cannot physically run a 248B model.** I'd be stuck with something half the size, half the quality. Meanwhile, the same money on the API covers **years** of heavy daily use — and the hardware would be obsolete long before that.
 
 Hardware depreciates monthly. Cloud frontier models get smarter weekly. New providers launch, prices keep dropping, and you can switch brains anytime — no lock-in.
 
-So I stopped buying servers and built **MavKa** — a one-line installer that drops a full AI assistant into your Telegram, powered by these absurdly cheap cloud models. Five minutes. Two dollars. Done.
+So I stopped buying servers and built **MavKa** — a one-line installer that drops a full AI assistant into your Telegram, powered by these absurdly cheap cloud models. Five minutes. ~$2 a month on DeepSeek for an active chat companion. Done.
 
-> **The lifehack of 2026: don't pay for ChatGPT Plus. Don't buy a $10,000 server. Pay $2 to DeepSeek and keep the change.**
+> **The lifehack of 2026: don't pay $20/month for ChatGPT Plus. Don't buy a $10,000 server. Top up $2 on DeepSeek and use it for a month.**
 
 ## Why MavKa Kills ChatGPT Plus
 
 | | ChatGPT Plus | **MavKa** |
 |---|---|---|
-| **Price** | $20/month | **~$0.05/month** ($2 starter credit lasts a year) |
+| **Price** | $20/month | **~$2/month** (active chat use, on DeepSeek) |
 | **Brain** | One model, take it or leave it | **5 providers**, swap anytime |
 | **Where you use it** | Their app, their UI, their rules | **Telegram + your terminal** |
 | **Voice in** | Yes | Yes (Groq Whisper, free) |
@@ -84,7 +84,7 @@ OpenAI can't switch you to Anthropic. Anthropic can't put themselves on your pho
 
 | | Cursor | Claude Code / OpenClaw | **MavKa** |
 |---|---|---|---|
-| Price | $20/mo | Pay-per-token | **~$0.30/mo heavy coding (DeepSeek)** |
+| Price | $20/mo | Pay-per-token | **~$5–10/mo heavy coding (DeepSeek)** |
 | Where you talk to it | IDE only | Terminal only | **Telegram + terminal** |
 | Voice control (in + out) | No | No | **Yes — fully hands-free** |
 | Photo / screenshot understanding | No | No | **Yes** |
@@ -191,15 +191,15 @@ Same brain. Same memory. Same conversation. **One install, no IDE switch, no $20
 
 MavKa is **provider-agnostic**. Choose at install time, swap anytime by re-running the installer:
 
-| Provider | Why pick it | Cost |
+| Provider | Why pick it | Active chat-bot use (real) |
 |---|---|---|
-| **DeepSeek** V4 Flash | 248B parameters at $0.14/M tokens — the lifehack. *(recommended)* | **~$0.05/mo casual** |
+| **DeepSeek** V4 Flash | 248B parameters at $0.14/M tokens — the lifehack. *(recommended)* | **~$2/mo** |
 | **ChatGPT** GPT-4o-mini | Mainstream OpenAI quality, familiar API | ~$5/mo |
-| **Opus** Claude 4.7 | Anthropic's flagship — smartest model on the market | ~$30/mo |
-| **Kimi 2.6** Moonshot | Long-context (128k+), strong on code | ~$3/mo |
-| **Groq** Llama 3.3 70B | Free tier with daily limits, fastest inference | **$0** |
+| **Kimi 2.6** Moonshot | Long-context (262K), strong on code | ~$25–35/mo |
+| **Opus** Claude 4.7 | Anthropic's flagship — smartest model on the market | ~$200–400/mo (no caching) |
+| **Groq** Llama 3.3 70B | Free tier with daily limits, fastest inference | **$0** *(within free quota)* |
 
-Why DeepSeek is the recommendation: **no other provider gets you a 248B model anywhere near $0.14 per million tokens.** It's a generational price-to-quality leap. The other four are there because nobody likes lock-in.
+Why DeepSeek is the recommendation: **no other provider gets you a 248B model anywhere near $0.14 per million tokens.** It's a generational price-to-quality leap. Every other provider listed here is **at least 2–200× more expensive** for the same daily chat volume. The reason they're still in the menu: nobody likes lock-in, and some users have credits or strong preferences.
 
 ## Install
 
@@ -313,17 +313,19 @@ MavKa runs **Pi Coding Agent** under the hood, and Pi is intentionally a "YOLO" 
 
 **If that's not your trust level**, don't install MavKa on a machine with credentials you can't afford to lose. Run it in a VM, or wait for a future version with stronger sandboxing. Be honest about who's getting SSH-equivalent access here: you, the LLM you picked, and (in theory) anyone who can compromise that LLM provider.
 
-## The Real Cost
+## The Real Cost — Honest Numbers
 
-| Provider | Casual chat | Heavy coding |
+These are real costs at typical chat-bot use (~150–200K tokens/day total — the kind of person who actually uses MavKa daily for chat, voice, photos, web search, light coding).
+
+| Provider | Active chat-bot use | Heavy coding |
 |---|---|---|
-| **DeepSeek** V4 Flash *(recommended)* | **~$0.05/mo** | ~$0.30/mo |
-| **Groq** Llama 3.3 70B | **$0** *(free tier covers casual)* | ~$1/mo over free TPD |
-| **ChatGPT** GPT-4o-mini | ~$0.06/mo | ~$0.40/mo |
-| **Kimi 2.6** Moonshot | ~$0.40/mo | ~$2.60/mo |
-| **Opus** Claude 4.7 | ~$2/mo | ~$15/mo with prompt caching |
+| **DeepSeek** V4 Flash *(recommended)* | **~$2/mo** | ~$5–10/mo |
+| **Groq** Llama 3.3 70B | **$0** *(within free tier; lighter chats only — limits hit fast on heavy days)* | ~$10–20/mo over free TPD |
+| **ChatGPT** GPT-4o-mini | ~$5/mo | ~$15–25/mo |
+| **Kimi 2.6** Moonshot | ~$25–35/mo | ~$50–80/mo |
+| **Opus** Claude 4.7 | ~$200–400/mo (no caching) | ~$50–150/mo with aggressive prompt caching |
 
-Tools layered on top:
+Tools layered on top (free):
 
 | Service | Pricing |
 |---|---|
@@ -331,11 +333,9 @@ Tools layered on top:
 | Gemini Vision (photos) | Free tier |
 | Tavily Search | Free tier (1000/mo) |
 
-**Sticker math:** at DeepSeek's $0.14/M input + $0.28/M output, a casual user (~5K input + 2K output per day) spends about **5 cents/month**. The $2 starter credit DeepSeek requires you to top up will literally last a year. *That's not a typo.*
+**Why DeepSeek is the only honest answer:** at $0.14/M input + $0.28/M output, an active daily user pays about **$2 a month**. Not $0.05. Not "$2 lasts a year." About **$2 a month** — and that's still cheaper than every alternative on this list by 2× to 200×. The $2 starter credit DeepSeek requires you to top up will last roughly **one month** of active use. When it runs out, top up another $2 and keep going.
 
-For heavy coding (~50K input + 10K output/day) it's ~$0.30/mo on DeepSeek, ~$15/mo on Claude Opus. Still nowhere near ChatGPT Plus.
-
-*Prices as of April 2026. AI providers change pricing frequently — verify on the official pricing page before committing. Numbers are estimates from real measurements.*
+*Prices as of May 2026. AI providers change pricing frequently — verify on the official pricing page before committing. Numbers above are realistic estimates for an active chat-bot user, not lab benchmarks.*
 
 ## How It Works
 
@@ -397,5 +397,5 @@ If something breaks — [open an issue on GitHub](https://github.com/MozgAI/MavK
 
 ---
 
-<p align="center"><b>Stop paying $20/month for AI you don't own.<br>Stop fighting CLIs to ship code with AI.<br>One install. Two dollars. Forever yours.</b></p>
+<p align="center"><b>Stop paying $20/month for AI you don't own.<br>Stop fighting CLIs to ship code with AI.<br>One install. ~$2 a month. Forever yours.</b></p>
 <p align="center"><sub>Made with 🍃 — open source forever.</sub></p>

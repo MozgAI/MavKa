@@ -65,7 +65,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="deepseek-v4-flash:off"
       PROVIDER_KEY_PREFIX="sk-"
       PROVIDER_PI_NAME="deepseek"
-      PROVIDER_NOTE="Cheapest. \$2 starter credit lasts ~1 year of casual daily use."
+      PROVIDER_NOTE="Cheapest by far. ~\$2/month for active chat-bot use. \$2 starter credit ≈ 1 month."
       ;;
     openai)
       PROVIDER_NAME="openai"
@@ -76,7 +76,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="gpt-4o-mini"
       PROVIDER_KEY_PREFIX="sk-"
       PROVIDER_PI_NAME="openai"
-      PROVIDER_NOTE="GPT-4o-mini. \$5 starter credit ≈ 2-3 weeks of daily use."
+      PROVIDER_NOTE="GPT-4o-mini. ~\$5/month for active chat-bot use."
       ;;
     anthropic)
       PROVIDER_NAME="anthropic"
@@ -88,7 +88,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="claude-opus-4-7"
       PROVIDER_KEY_PREFIX="sk-ant-"
       PROVIDER_PI_NAME="anthropic"
-      PROVIDER_NOTE="Claude Opus 4.7 — flagship reasoning. Higher cost."
+      PROVIDER_NOTE="Claude Opus 4.7 — smartest model on the market. ~\$200–400/month for active use without prompt caching."
       ;;
     kimi)
       PROVIDER_NAME="kimi"
@@ -99,7 +99,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="kimi-k2.6"
       PROVIDER_KEY_PREFIX="sk-"
       PROVIDER_PI_NAME="moonshotai"
-      PROVIDER_NOTE="Moonshot Kimi-K2.6. 262K context, strong on coding."
+      PROVIDER_NOTE="Moonshot Kimi-K2.6. 262K context, strong on coding. ~\$25–35/month for active chat-bot use."
       ;;
     groq)
       PROVIDER_NAME="groq"
@@ -110,7 +110,7 @@ load_provider() {
       PROVIDER_RUN_MODEL="llama-3.3-70b-versatile"
       PROVIDER_KEY_PREFIX="gsk_"
       PROVIDER_PI_NAME="groq"
-      PROVIDER_NOTE="Free tier with daily limits. Fastest inference."
+      PROVIDER_NOTE="Free tier with daily limits. Fastest inference. \$0/month if you stay within free quota."
       ;;
   esac
 }
@@ -174,7 +174,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (пошук): "
       L_ds_brain="DeepSeek — мозок MavKa"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 стартового кредиту вистачає на \~рік повсякденного використання"
+      L_ds_credit="\$2 стартового кредиту вистачає приблизно на місяць активного використання"
       L_ds_signup="Зареєструйся, поповни рахунок на \$2, створи API Key і встав сюди."
       L_verifying="Перевіряємо ключ..."
       L_ds_works="DeepSeek API ключ працює!"
@@ -219,7 +219,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (фото): "; L_tavily_key="Tavily API Key (поиск): "
       L_ds_brain="DeepSeek — мозг MavKa"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 стартового кредита хватает примерно на \~год обычного использования"
+      L_ds_credit="\$2 стартового кредита хватает примерно на месяц активного использования"
       L_ds_signup="Зарегистрируйся, пополни счёт на \$2, создай API Key и вставь сюда."
       L_verifying="Проверяем ключ..."
       L_ds_works="DeepSeek API ключ работает!"
@@ -264,7 +264,7 @@ set_lang() {
       L_gemini_key="Gemini API Key (photos): "; L_tavily_key="Tavily API Key (web search): "
       L_ds_brain="DeepSeek — MavKa's brain"
       L_ds_url="platform.deepseek.com"
-      L_ds_credit="\$2 starter credit lasts \~1 year of casual daily use"
+      L_ds_credit="\$2 starter credit ≈ 1 month of active chat-bot use"
       L_ds_signup="Sign up, top up \$2, create an API key, and paste it here."
       L_verifying="Verifying API key..."
       L_ds_works="DeepSeek API key works!"

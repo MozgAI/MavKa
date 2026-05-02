@@ -197,7 +197,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'deepseek-chat'
             $script:PROVIDER_RUN_MODEL  = 'deepseek-v4-flash:off'
             $script:PROVIDER_PI_NAME    = 'deepseek'
-            $script:PROVIDER_NOTE       = 'Cheapest. $2 starter credit lasts ~1 year of casual daily use.'
+            $script:PROVIDER_NOTE       = 'Cheapest by far. ~$2/month for active chat-bot use. $2 starter credit ≈ 1 month.'
         }
         'openai' {
             $script:PROVIDER_NAME       = 'openai'
@@ -207,7 +207,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'gpt-4o-mini'
             $script:PROVIDER_RUN_MODEL  = 'gpt-4o-mini'
             $script:PROVIDER_PI_NAME    = 'openai'
-            $script:PROVIDER_NOTE       = 'GPT-4o-mini. $5 starter credit ≈ 2-3 weeks of daily use.'
+            $script:PROVIDER_NOTE       = 'GPT-4o-mini. ~$5/month for active chat-bot use.'
         }
         'anthropic' {
             $script:PROVIDER_NAME       = 'anthropic'
@@ -218,7 +218,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'claude-haiku-4-5'
             $script:PROVIDER_RUN_MODEL  = 'claude-opus-4-7'
             $script:PROVIDER_PI_NAME    = 'anthropic'
-            $script:PROVIDER_NOTE       = 'Claude Opus 4.7 — flagship reasoning. Higher cost.'
+            $script:PROVIDER_NOTE       = 'Claude Opus 4.7 — smartest model on the market. ~$200–400/month for active use without prompt caching.'
         }
         'kimi' {
             $script:PROVIDER_NAME       = 'kimi'
@@ -228,7 +228,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'kimi-k2.6'
             $script:PROVIDER_RUN_MODEL  = 'kimi-k2.6'
             $script:PROVIDER_PI_NAME    = 'moonshotai'
-            $script:PROVIDER_NOTE       = 'Moonshot Kimi-K2.6. 262K context, strong on coding.'
+            $script:PROVIDER_NOTE       = 'Moonshot Kimi-K2.6. 262K context, strong on coding. ~$25–35/month for active chat-bot use.'
         }
         'groq' {
             $script:PROVIDER_NAME       = 'groq'
@@ -238,7 +238,7 @@ function Load-Provider {
             $script:PROVIDER_VERIFY_MODEL = 'llama-3.3-70b-versatile'
             $script:PROVIDER_RUN_MODEL  = 'llama-3.3-70b-versatile'
             $script:PROVIDER_PI_NAME    = 'groq'
-            $script:PROVIDER_NOTE       = 'Free tier with daily limits. Fastest inference.'
+            $script:PROVIDER_NOTE       = 'Free tier with daily limits. Fastest inference. $0/month if you stay within free quota.'
         }
     }
 }
