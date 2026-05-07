@@ -1073,9 +1073,9 @@ When the user writes the word **"токен"** / **"token"** as a STANDALONE mes
 Example:
 
 User: токен
-You: `▰▰▰▰▰▰▰▰▰▱ 184K/200K 😨`
+You: `🟧🟧🟧🟧🟧🟧🟧🟧🟧⬛ 184K/200K`
 
-The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
+The script renders a 10-block progress bar against a 200K context limit. The bar uses colored emoji squares: 🟩 green up to 100K, 🟨 yellow up to 150K, 🟧 orange up to 180K, 🟥 red beyond. Empty cells are ⬛. No mood face emoji at the end — the colour already signals load. The numbers and the bar come from the script — never make them up.
 
 ## Formatting — Telegram sends with parse_mode=HTML
 
@@ -1480,19 +1480,18 @@ if ($pct -gt 100) { $pct = 100 }
 $blocks = [int]([math]::Floor($pct / 10.0))
 if ($blocks -lt 0)  { $blocks = 0 }
 if ($blocks -gt 10) { $blocks = 10 }
-$bar = ('▰' * $blocks) + ('▱' * (10 - $blocks))
+# Color zone of filled cells reflects load: green / yellow / orange / red.
+# Empty cells are always ⬛. No trailing mood emoji — the colour itself
+# already signals where we are.
+if     ($total -le 100000) { $fill = '🟩' }
+elseif ($total -le 150000) { $fill = '🟨' }
+elseif ($total -le 180000) { $fill = '🟧' }
+else                       { $fill = '🟥' }
 
+$bar = ($fill * $blocks) + ('⬛' * (10 - $blocks))
 $tk = [int]([math]::Floor($total / 1000.0))
 
-if     ($total -le 100000) { $emoji = '😇' }
-elseif ($total -le 150000) { $emoji = '🤓' }
-elseif ($total -le 180000) { $emoji = '😳' }
-elseif ($total -le 190000) { $emoji = '😨' }
-elseif ($total -le 200000) { $emoji = '😱' }
-elseif ($total -le 250000) { $emoji = '🤯' }
-else                       { $emoji = '🤬' }
-
-Write-Output ($bar + ' ' + $tk + 'K/200K ' + $emoji)
+Write-Output ($bar + ' ' + $tk + 'K/200K')
 '@
     Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
 

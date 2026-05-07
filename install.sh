@@ -1212,9 +1212,9 @@ When the user writes the word **"токен"** / **"token"** as a STANDALONE mes
 Example:
 
 User: токен
-You: \`▰▰▰▰▰▰▰▰▰▱ 184K/200K 😨\`
+You: \`🟧🟧🟧🟧🟧🟧🟧🟧🟧⬛ 184K/200K\`
 
-The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
+The script renders a 10-block progress bar against a 200K context limit. The bar uses colored emoji squares: 🟩 green up to 100K, 🟨 yellow up to 150K, 🟧 orange up to 180K, 🟥 red beyond. Empty cells are ⬛. No mood face emoji at the end — the colour already signals load. The numbers and the bar come from the script — never make them up.
 
 ## "British" mode — instant voice-to-English translation
 
@@ -1666,19 +1666,19 @@ BLOCKS=$(( PCT / 10 ))
 [ "$BLOCKS" -lt 0 ] && BLOCKS=0
 [ "$BLOCKS" -gt 10 ] && BLOCKS=10
 
-BAR=$(python3 -c "print('▰' * $BLOCKS + '▱' * (10 - $BLOCKS))")
-
-if   [ "$TOTAL" -le 100000 ]; then EMOJI='😇'
-elif [ "$TOTAL" -le 150000 ]; then EMOJI='🤓'
-elif [ "$TOTAL" -le 180000 ]; then EMOJI='😳'
-elif [ "$TOTAL" -le 190000 ]; then EMOJI='😨'
-elif [ "$TOTAL" -le 200000 ]; then EMOJI='😱'
-elif [ "$TOTAL" -le 250000 ]; then EMOJI='🤯'
-else                               EMOJI='🤬'
+# Color zone of filled cells reflects load: green / yellow / orange / red.
+# Empty cells are always ⬛. No trailing mood emoji — the colour itself
+# already says how stressed we should be.
+if   [ "$TOTAL" -le 100000 ]; then FILL='🟩'
+elif [ "$TOTAL" -le 150000 ]; then FILL='🟨'
+elif [ "$TOTAL" -le 180000 ]; then FILL='🟧'
+else                               FILL='🟥'
 fi
 
+BAR=$(python3 -c "print('${FILL}' * $BLOCKS + '⬛' * (10 - $BLOCKS))")
+
 TK=$(( TOTAL / 1000 ))
-echo "${BAR} ${TK}K/200K ${EMOJI}"
+echo "${BAR} ${TK}K/200K"
 TOKENEOF
   chmod +x "$MAVKA_HOME/token.sh"
 
