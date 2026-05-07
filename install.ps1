@@ -72,6 +72,23 @@ function Invoke-Native {
     return ($LASTEXITCODE -eq 0)
 }
 
+# ─── Sanitize Telegram User ID ──────────────────────────────────
+# @userinfobot replies with a numeric id (e.g. 1234567890). Users sometimes
+# paste their @username instead, which then explodes when we cast to [int64].
+# This helper accepts a numeric id with optional surrounding whitespace and
+# a stray leading "@" or "id:" prefix; returns ``$null`` on anything else so
+# callers can reprompt with a clear error.
+function Sanitize-TelegramUserId {
+    param([string]$value)
+    if ($null -eq $value) { return $null }
+    $v = $value.Trim()
+    $v = $v -replace '^@', ''
+    $v = $v -replace '^[Ii][Dd]\s*[:=]\s*', ''
+    $v = $v.Trim()
+    if ($v -match '^\d+$') { return $v }
+    return $null
+}
+
 # ─── UTF-8 without BOM ──────────────────────────────────────────
 # PowerShell 5.1's `Set-Content -Encoding UTF8` writes a BOM, which breaks
 # Pi Agent's JSON parser. Use this helper for any file that another tool
@@ -574,12 +591,26 @@ function AI-GuidedSetup {
         } while ([string]::IsNullOrWhiteSpace($script:TG_TOKEN))
     }
 
+    # AI-guided already validated; defensively re-clean.
+    if (-not [string]::IsNullOrWhiteSpace($script:TG_USER_ID)) {
+        $cleaned = Sanitize-TelegramUserId $script:TG_USER_ID
+        if ($cleaned) { $script:TG_USER_ID = $cleaned } else { $script:TG_USER_ID = '' }
+    }
     if ([string]::IsNullOrWhiteSpace($script:TG_USER_ID)) {
         Write-Host "  ${RED}⚠ Telegram User ID is still needed.${NC}"
         do {
-            $script:TG_USER_ID = Read-Host "  Your Telegram User ID"
-            if ([string]::IsNullOrWhiteSpace($script:TG_USER_ID)) {
-                Write-Host "  ${DIM}  $($script:L_userid_get) ${NC}${PURPLE}$($script:L_userid_url)${NC}"
+            $raw = Read-Host "  Your Telegram User ID (digits only — get from $($script:L_userid_url))"
+            $clean = Sanitize-TelegramUserId $raw
+            if (-not $clean) {
+                if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                    Write-Host "  ${RED}⚠ That isn't a numeric Telegram ID (got: $raw).${NC}"
+                    Write-Host "  ${DIM}  @userinfobot replies with a number like 1234567890. Don't paste your @username.${NC}"
+                } else {
+                    Write-Host "  ${DIM}  $($script:L_userid_get) ${NC}${PURPLE}$($script:L_userid_url)${NC}"
+                }
+                $script:TG_USER_ID = ''
+            } else {
+                $script:TG_USER_ID = $clean
             }
         } while ([string]::IsNullOrWhiteSpace($script:TG_USER_ID))
     }
@@ -601,8 +632,18 @@ function Manual-CollectRemaining {
 
     Step-Header 7 "Telegram User ID" $script:L_tag_required
     Write-Host "  ${DIM}$($script:L_userid_get) ${NC}${PURPLE}$($script:L_userid_url)${NC}"
+    Write-Host "  ${DIM}  (it replies with a number like 1234567890 — paste THAT, not your @username)${NC}"
     do {
-        $script:TG_USER_ID = Read-Host "  Your Telegram User ID"
+        $raw = Read-Host "  Your Telegram User ID"
+        $clean = Sanitize-TelegramUserId $raw
+        if (-not $clean) {
+            if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                Write-Host "  ${RED}⚠ That isn't a numeric Telegram ID (got: $raw). Don't paste your @username — paste the number from @userinfobot.${NC}"
+            }
+            $script:TG_USER_ID = ''
+        } else {
+            $script:TG_USER_ID = $clean
+        }
     } while ([string]::IsNullOrWhiteSpace($script:TG_USER_ID))
 
     $script:GROQ_KEY = Read-Host "  Groq API Key (voice, optional)"
@@ -881,6 +922,11 @@ function Configure-Pi {
 
     # telegram.json — schema MUST match install.sh / pi-telegram TelegramConfig:
     # { botToken: string, allowedUserId: number, lastUpdateId: number }
+    $cleanedTgUserId = Sanitize-TelegramUserId $script:TG_USER_ID
+    if (-not $cleanedTgUserId) {
+        fail "Telegram User ID must be a numeric id from @userinfobot, got: $($script:TG_USER_ID). Re-run the installer and paste the number, not your @username."
+    }
+    $script:TG_USER_ID = $cleanedTgUserId
     $tg = @{
         botToken = $script:TG_TOKEN
         allowedUserId = [int64]$script:TG_USER_ID
