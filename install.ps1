@@ -1064,22 +1064,22 @@ When the user explicitly asks to switch ("answer in English", "ответь по
 - File system access on the user's machine
 - Memory recall: `recall.cmd "query"` (search wiki + history + summaries)
 - Hot-swap API key: `setkey.cmd <provider> <new_key>` (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: `token.cmd` (returns TWO lines as plain text — bar + bold-wrapped counter, then a phrase; only invoke on the explicit "токен" trigger below)
+- Token statusline: `token.cmd` (returns TWO lines of plain text — bar + counter, then a phrase; only invoke on the explicit "токен" trigger below)
 
 ## "Token" trigger — two-line context-usage indicator
 
 When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of `token.cmd`** as plain text. The script returns TWO lines:
 
-1. The bar plus a bold-wrapped counter (`<bar> *<K>K/200K*`) — emoji squares align by themselves, the counter is bold via single asterisks
+1. The bar plus the counter (`<bar> <K>K/200K`) — emoji squares carry the visual themselves
 2. A one-line Gilfoyle-deadpan phrase tied to the cube count
 
-Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, or commentary. No backticks, no `<code>`, no quotes — pi-telegram applies markdown to the bold asterisks but leaves the rest as plain text.
+Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, commentary, asterisks, backticks, `<code>`, or quotes. Pure plain text. The asterisk-wrapped bold version was tried and pi-telegram leaves the asterisks visible — so we drop them.
 
 Example:
 
 User: токен
 You:
-🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ *135K/200K*
+🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 135K/200K
 RAM держится на кофеине и сексуальном напряжении
 
 Two-tone thermometer: every filled cube is the same colour, every empty cube is ⬛. Colour is chosen by cube count — 1-2 🟩 green, 3-5 🟨 yellow, 6-8 🟧 orange, 9-10 🟥 red. The phrase comes from a fixed table inside the script, indexed by cube count (0..10) plus an overflow line at 11, in the install language. Numbers, bar, and phrase all come from the script — never paraphrase or invent.
@@ -1595,7 +1595,7 @@ $phrases = @{
 if (-not $phrases.ContainsKey($LangCode)) { $LangCode = 'en' }
 $phrase = $phrases[$LangCode][$idx]
 
-Write-Output ($bar + ' *' + $tk + 'K/200K*')
+Write-Output ($bar + ' ' + $tk + 'K/200K')
 Write-Output $phrase
 '@ -replace '__LANG__', $script:BOT_LANG
     Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
