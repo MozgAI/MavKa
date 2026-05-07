@@ -1073,7 +1073,7 @@ When the user writes the word **"токен"** / **"token"** as a STANDALONE mes
 Example:
 
 User: токен
-You: `█████████░ 184K/200K 😨`
+You: `▰▰▰▰▰▰▰▰▰▱ 184K/200K 😨`
 
 The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
@@ -1480,7 +1480,7 @@ if ($pct -gt 100) { $pct = 100 }
 $blocks = [int]([math]::Floor($pct / 10.0))
 if ($blocks -lt 0)  { $blocks = 0 }
 if ($blocks -gt 10) { $blocks = 10 }
-$bar = ('█' * $blocks) + ('░' * (10 - $blocks))
+$bar = ('▰' * $blocks) + ('▱' * (10 - $blocks))
 
 $tk = [int]([math]::Floor($total / 1000.0))
 
