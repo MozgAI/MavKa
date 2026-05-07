@@ -311,6 +311,34 @@ function Refresh-Path {
     $env:Path = "$machinePath;$userPath"
 }
 
+# ─── Find a real Python (defeat the WindowsApps stub) ───────────
+# The stub ``python.exe`` in %LOCALAPPDATA%\Microsoft\WindowsApps prints
+# "Python was not found; run without arguments to install from the
+# Microsoft Store" instead of running scripts. Get-Command finds it; we
+# don't trust that. We try each candidate command, run ``--version``, and
+# require the output to match ``Python <major>.<minor>`` AND exit 0.
+# Returns the resolved executable path on success, or $null if no real
+# Python is on PATH.
+function Find-RealPython {
+    foreach ($cand in @('python', 'python3', 'py')) {
+        $cmd = Get-Command $cand -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        # The stub lives under WindowsApps — skip even if Get-Command finds it.
+        $src = $cmd.Source
+        if ($src -and $src -like '*\Microsoft\WindowsApps\*') { continue }
+        $output = $null
+        try {
+            $output = (& $src --version 2>&1) -join "`n"
+        } catch {
+            continue
+        }
+        if ($LASTEXITCODE -eq 0 -and $output -match 'Python\s+\d+\.\d+') {
+            return $src
+        }
+    }
+    return $null
+}
+
 # ─── Dependency installer ───────────────────────────────────────
 function Ensure-Winget {
     if (Get-Command winget -ErrorAction SilentlyContinue) { return }
@@ -352,10 +380,21 @@ function Install-Deps {
         ok "Node.js already installed ($(node --version))"
     }
 
-    if (-not (Get-Command python -ErrorAction SilentlyContinue) -and -not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+    # Python detection on Windows must defeat the WindowsApps stub. The stub
+    # ``python.exe`` lives at %LOCALAPPDATA%\Microsoft\WindowsApps and shows
+    # up in PATH before real installs. Get-Command finds it; running it just
+    # opens Microsoft Store. So we don't trust Get-Command — we actually
+    # invoke ``--version`` and require the output to match Python.
+    $script:PYTHON_EXE = Find-RealPython
+    if (-not $script:PYTHON_EXE) {
         Winget-Install 'Python.Python.3.12' 'Python 3.12'
+        Refresh-Path
+        $script:PYTHON_EXE = Find-RealPython
+        if (-not $script:PYTHON_EXE) {
+            warn "Real Python still not detected after winget install. AI-guided setup and edge-tts/whisper may be unavailable."
+        }
     } else {
-        ok "Python already installed"
+        ok "Python detected: $script:PYTHON_EXE"
     }
 
     Refresh-Path
@@ -372,7 +411,9 @@ function Install-Deps {
         ok "Pi Agent already installed"
     }
 
-    $pyCmd = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
+    # Use the verified real Python from earlier; fall back to plain ``python``
+    # only if detection somehow failed (warned above).
+    $pyCmd = if ($script:PYTHON_EXE) { $script:PYTHON_EXE } else { 'python' }
     $pipCommonFlags = @('--user', '--quiet', '--no-warn-script-location', '--disable-pip-version-check')
 
     info "Installing edge-tts (voice output)..."
@@ -561,11 +602,15 @@ function Collect-Info {
 
 # ─── AI-Guided Setup (calls embedded Python) ────────────────────
 function AI-GuidedSetup {
+    if (-not $script:PYTHON_EXE) {
+        warn "Real Python not available — skipping AI-guided setup, falling back to manual."
+        Manual-CollectRemaining
+        return
+    }
     $aiScript = Join-Path $env:TEMP 'mavka-ai-setup.py'
     Set-Content -Path $aiScript -Value (Get-AISetupPython) -Encoding UTF8
 
-    $pyCmd = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
-    & $pyCmd $aiScript
+    & $script:PYTHON_EXE $aiScript
     Remove-Item $aiScript -ErrorAction SilentlyContinue
 
     $configFile = Join-Path $env:TEMP 'mavka-setup-config.json'
