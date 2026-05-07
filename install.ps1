@@ -390,9 +390,17 @@ function Add-PythonUserScriptsToPath {
     param([string]$pyCmd)
     $scriptsDir = $null
     try {
-        $scriptsDir = (& $pyCmd -c "import sysconfig; print(sysconfig.get_path('scripts', f'{sysconfig.get_default_scheme()}_user'))" 2>$null).Trim()
+        # Use string concat (not f-string) so older Pythons (<3.6) don't fail.
+        $scriptsDir = (& $pyCmd -c "import sysconfig; print(sysconfig.get_path('scripts', sysconfig.get_default_scheme() + '_user'))" 2>$null).Trim()
     } catch {}
-    if (-not $scriptsDir -or -not (Test-Path $scriptsDir)) { return }
+    if (-not $scriptsDir) {
+        warn "Could not detect Python user Scripts dir (older Python or sysconfig unavailable). edge-tts/whisper may need PATH set manually."
+        return
+    }
+    if (-not (Test-Path $scriptsDir)) {
+        info "Python user Scripts dir does not exist yet at $scriptsDir — pip --user installs may not have populated it."
+        return
+    }
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     if ($userPath -notlike "*$scriptsDir*") {
         $newPath = if ($userPath) { "$userPath;$scriptsDir" } else { $scriptsDir }
@@ -1105,25 +1113,27 @@ Frozen. To update an existing fact, mark old line with ``(ended: YYYY-MM-DD)`` a
 
     # run.cmd — schtasks invokes this on logon. Builds the system prompt
     # by concatenating IDENTITY.md + MEMORY.md + frozen pages, then exec'ing pi.
-    # Single-instance guard: a lockfile prevents a second concurrent start
-    # (a second logon, double-click on run.cmd, or `mavka start`). A stale
-    # lock from a crash blocks one start — user clears it via `mavka stop`
-    # or `del mavka.lock`. The Task Scheduler ONLOGON trigger also has
-    # `MultipleInstancesPolicy=IgnoreNew` semantics by default.
+    # Single-instance guard: ``mkdir`` of a *directory* is atomic on NTFS, so
+    # two concurrent starts cannot both pass the check. A stale lock from a
+    # crash blocks one start — clear via ``mavka stop`` or
+    # ``rmdir /S /Q mavka.lock``.
     $runCmd = @"
 @echo off
 setlocal
 cd /d "%USERPROFILE%\mavka-bot"
 
-if exist mavka.lock (
-    echo %DATE% %TIME%: lockfile present — MavKa already running. To override: del "%USERPROFILE%\mavka-bot\mavka.lock" >> mavka.log
+mkdir mavka.lock 2>nul || (
+    echo %DATE% %TIME%: lock present, MavKa already running. To override: rmdir /S /Q "%USERPROFILE%\mavka-bot\mavka.lock" >> mavka.log
     exit /b 0
 )
 
-> mavka.lock echo started %DATE% %TIME%
 echo %DATE% %TIME%: Starting MavKa... >> mavka.log
 
-where pi >nul 2>&1 || (echo pi command not on PATH >> mavka.log & del mavka.lock >nul 2>&1 & exit /b 1)
+where pi >nul 2>&1 || (
+    echo pi command not on PATH >> mavka.log
+    rmdir /S /Q mavka.lock >nul 2>&1
+    exit /b 1
+)
 
 set PROMPT_FILE=%TEMP%\mavka-prompt.md
 copy /Y "%USERPROFILE%\mavka-bot\IDENTITY.md" "%PROMPT_FILE%" >nul
@@ -1151,63 +1161,88 @@ for %%F in ("%USERPROFILE%\mavka-bot\memory\feedback_*.md") do (
 
 pi --provider $($script:PROVIDER_PI_NAME) --model $($script:PROVIDER_RUN_MODEL) --append-system-prompt "%PROMPT_FILE%" >> mavka.log 2>&1
 
-del mavka.lock >nul 2>&1
+rmdir /S /Q mavka.lock >nul 2>&1
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'run.cmd') -Value $runCmd -Encoding ASCII
 
-    # mavka.cmd — user-facing wrapper (start/stop/logs/doctor/...)
+    # mavka.cmd — user-facing wrapper (start/stop/logs/doctor/...). Uses
+    # GOTO branching instead of parenthesised blocks so that delayed-expansion
+    # quirks and `^` escaping inside `( )` do not bite us. ASCII-only text
+    # because the file is written with -Encoding ASCII (Unicode would render
+    # as `?`).
     $mavkaCmd = @"
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 set ACTION=%1
 if "%ACTION%"=="" set ACTION=help
 
-if /i "%ACTION%"=="start" (
-    schtasks /Run /TN "MavKa" >nul 2>&1
-    echo MavKa started. Check logs: mavka logs
-    goto :eof
+if /i "%ACTION%"=="start"     goto :do_start
+if /i "%ACTION%"=="stop"      goto :do_stop
+if /i "%ACTION%"=="logs"      goto :do_logs
+if /i "%ACTION%"=="status"    goto :do_status
+if /i "%ACTION%"=="restart"   goto :do_restart
+if /i "%ACTION%"=="doctor"    goto :do_doctor
+if /i "%ACTION%"=="uninstall" goto :do_uninstall
+goto :do_help
+
+:do_start
+schtasks /Run /TN "MavKa" >nul 2>&1
+echo MavKa started. Check logs: mavka logs
+goto :eof
+
+:do_stop
+schtasks /End /TN "MavKa" >nul 2>&1
+rem Kill node.exe processes running pi with this user's mavka-prompt.md.
+rem Pi runs as ``node ...pi-coding-agent...`` (no pi.exe). The prompt-file
+rem path in CommandLine is the unique discriminator that avoids killing
+rem unrelated Pi sessions. Then exit with the surviving-process count so
+rem we can detect a partial failure without parsing stdout.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*mavka-prompt.md*' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 500; exit @(Get-CimInstance Win32_Process | Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*mavka-prompt.md*' }).Count"
+if errorlevel 1 (
+    echo Stop FAILED: at least one MavKa node process is still alive. Lock left in place.
+    echo Inspect with: tasklist /FI "IMAGENAME eq node.exe" /V
+    exit /b 1
 )
-if /i "%ACTION%"=="stop" (
-    schtasks /End /TN "MavKa" >nul 2>&1
-    rem Kill any node.exe whose command line includes the mavka-bot folder.
-    rem (Pi runs as ``node ...pi-coding-agent...`` — there is no pi.exe.)
-    powershell -NoProfile -Command ^
-      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { `$_.CommandLine -match 'mavka-bot|pi-coding-agent' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }"
-    if exist "%USERPROFILE%\mavka-bot\mavka.lock" del "%USERPROFILE%\mavka-bot\mavka.lock" >nul 2>&1
-    echo MavKa stopped.
-    goto :eof
+if exist "%USERPROFILE%\mavka-bot\mavka.lock" rmdir /S /Q "%USERPROFILE%\mavka-bot\mavka.lock" >nul 2>&1
+echo MavKa stopped.
+goto :eof
+
+:do_logs
+powershell -NoProfile -Command "Get-Content -Path '%USERPROFILE%\mavka-bot\mavka.log' -Tail 50 -Wait"
+goto :eof
+
+:do_status
+schtasks /Query /TN "MavKa" /V /FO LIST 2>nul | findstr "Status"
+goto :eof
+
+:do_restart
+call "%~f0" stop
+if errorlevel 1 (
+    echo Restart aborted: stop failed.
+    exit /b 1
 )
-if /i "%ACTION%"=="logs" (
-    powershell -NoProfile -Command "Get-Content -Path '%USERPROFILE%\mavka-bot\mavka.log' -Tail 50 -Wait"
-    goto :eof
-)
-if /i "%ACTION%"=="status" (
-    schtasks /Query /TN "MavKa" /V /FO LIST 2>nul | findstr "Status"
-    goto :eof
-)
-if /i "%ACTION%"=="restart" (
-    call "%~f0" stop
-    timeout /t 2 /nobreak >nul
-    call "%~f0" start
-    goto :eof
-)
-if /i "%ACTION%"=="doctor" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\doctor.ps1"
-    goto :eof
-)
-if /i "%ACTION%"=="uninstall" (
-    schtasks /Delete /TN "MavKa" /F >nul 2>&1
-    echo MavKa uninstalled. Files in %USERPROFILE%\mavka-bot remain — delete manually if desired.
-    goto :eof
-)
+timeout /t 2 /nobreak >nul
+call "%~f0" start
+goto :eof
+
+:do_doctor
+powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\doctor.ps1"
+exit /b %ERRORLEVEL%
+
+:do_uninstall
+schtasks /Delete /TN "MavKa" /F >nul 2>&1
+echo MavKa uninstalled. Files in %USERPROFILE%\mavka-bot remain - delete manually if desired.
+goto :eof
+
+:do_help
 echo MavKa control:
-echo   mavka start     — start the bot
-echo   mavka stop      — stop the bot (kills node + clears lock)
-echo   mavka restart   — restart
-echo   mavka logs      — tail logs (Ctrl+C to stop)
-echo   mavka status    — scheduled task status
-echo   mavka doctor    — health check (Node, Python, Pi, FFmpeg, keys, Telegram)
-echo   mavka uninstall — remove scheduled task
+echo   mavka start     -- start the bot
+echo   mavka stop      -- stop the bot (kills matching node + clears lock)
+echo   mavka restart   -- stop, wait, start (aborts if stop fails)
+echo   mavka logs      -- tail logs (Ctrl+C to stop)
+echo   mavka status    -- scheduled task status
+echo   mavka doctor    -- health check; exits non-zero on failures
+echo   mavka uninstall -- remove scheduled task
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'mavka.cmd') -Value $mavkaCmd -Encoding ASCII
 
@@ -1325,10 +1360,12 @@ exit 0
 # Reports status of every dependency and config required for a working bot.
 $ErrorActionPreference = 'Continue'
 
+$script:DocFails = 0
+$script:DocWarns = 0
 function Section { param($t); Write-Host "`n== $t ==" -ForegroundColor Cyan }
 function Pass    { param($m); Write-Host "  [OK]   $m" -ForegroundColor Green }
-function Warn    { param($m); Write-Host "  [WARN] $m" -ForegroundColor Yellow }
-function Fail    { param($m); Write-Host "  [FAIL] $m" -ForegroundColor Red }
+function Warn    { param($m); Write-Host "  [WARN] $m" -ForegroundColor Yellow; $script:DocWarns++ }
+function Fail    { param($m); Write-Host "  [FAIL] $m" -ForegroundColor Red; $script:DocFails++ }
 
 $mavkaHome = Join-Path $env:USERPROFILE 'mavka-bot'
 $piHome = Join-Path $env:USERPROFILE '.pi\agent'
@@ -1412,11 +1449,17 @@ if (-not (Test-Path $mavkaHome)) {
     Fail "$mavkaHome missing"
 } else {
     Pass "$mavkaHome exists"
-    foreach ($f in 'IDENTITY.md','run.cmd','mavka.cmd','tts.cmd','whisper.cmd','setkey.cmd') {
+    foreach ($f in 'IDENTITY.md','run.cmd','mavka.cmd','tts.cmd','whisper.cmd','setkey.cmd','setkey.ps1','doctor.ps1') {
         if (Test-Path (Join-Path $mavkaHome $f)) { Pass $f } else { Fail "$f missing" }
     }
     $lock = Join-Path $mavkaHome 'mavka.lock'
-    if (Test-Path $lock) { Warn "mavka.lock present — run 'mavka stop' to clear if no node process is alive" }
+    if (Test-Path $lock) {
+        if ((Get-Item $lock).PSIsContainer) {
+            Warn "mavka.lock directory present — run 'mavka stop' to clear if no node process is alive"
+        } else {
+            Warn "mavka.lock is a file (legacy lock format) — run: rmdir /S /Q `"$lock`" or 'mavka stop'"
+        }
+    }
 }
 
 Section "Process"
@@ -1451,7 +1494,17 @@ if (Test-Path (Join-Path $piHome 'auth.json')) {
     }
 }
 
-Write-Host "`nDoctor finished. If you see [FAIL] above, fix that first.`n" -ForegroundColor Magenta
+Write-Host ""
+if ($script:DocFails -gt 0) {
+    Write-Host "Doctor: $($script:DocFails) FAIL, $($script:DocWarns) WARN — fix the FAIL items first." -ForegroundColor Red
+    exit 1
+} elseif ($script:DocWarns -gt 0) {
+    Write-Host "Doctor: 0 FAIL, $($script:DocWarns) WARN — install is usable but watch the warnings." -ForegroundColor Yellow
+    exit 2
+} else {
+    Write-Host "Doctor: all green." -ForegroundColor Green
+    exit 0
+}
 '@
     Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'doctor.ps1') $doctorPs1
 
