@@ -1203,22 +1203,22 @@ For 2-3 columns of simple data, prefer a bullet list with <b>bold</b> labels —
 - Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
 - Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
 - Hot-swap API key: \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`  (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns TWO lines — backtick-wrapped bar + counters, then a phrase; only invoke on the explicit "токен" trigger below)
+- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns TWO lines as plain text — bar + bold-wrapped counter, then a phrase; only invoke on the explicit "токен" trigger below)
 
 ## "Token" trigger — two-line context-usage indicator
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of \`bash ~/mavka-bot/token.sh\`**. The script returns TWO lines:
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of \`bash ~/mavka-bot/token.sh\`** as plain text. The script returns TWO lines:
 
-1. A backtick-wrapped bar plus counters (\`<bar> <K>K/200K\`)
+1. The bar plus a bold-wrapped counter (\`<bar> *<K>K/200K*\`) — emoji squares align by themselves, the counter is bold via single asterisks
 2. A one-line Gilfoyle-deadpan phrase tied to the cube count
 
-Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, commentary, or asterisks. The backticks on line 1 are markdown — pi-telegram renders that line as monospace so the emoji squares align cleanly.
+Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, or commentary. No backticks, no \`<code>\`, no quotes — pi-telegram applies markdown to the bold asterisks but leaves the rest as plain text, which is what we want.
 
 Example:
 
 User: токен
 You:
-\`🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 135K/200K\`
+🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ *135K/200K*
 RAM держится на кофеине и сексуальном напряжении
 
 Two-tone thermometer: every filled cube is the same colour, every empty cube is ⬛. Colour is chosen by cube count — 1-2 🟩 green, 3-5 🟨 yellow, 6-8 🟧 orange, 9-10 🟥 red. The phrase comes from a fixed table inside the script, indexed by cube count (0..10) plus an overflow line at 11, in the install language. Numbers, bar, and phrase all come from the script — never paraphrase or invent.
@@ -1794,7 +1794,7 @@ esac
 
 PHRASE="${PHRASES[$IDX]}"
 
-echo "\`${BAR} ${TK}K/200K\`"
+echo "${BAR} *${TK}K/200K*"
 echo "${PHRASE}"
 TOKENEOF
   # Bake the user's chosen install language into the script.
