@@ -41,6 +41,46 @@ function ok   { param($m); Write-Host "  ${GREEN}✓${NC} ${GREY}$m${NC}" }
 function warn { param($m); Write-Host "  ${YELLOW}⚠${NC} $m" }
 function fail { param($m); Write-Host "`n${RED}✗ $m${NC}"; exit 1 }
 
+# ─── Native command runner ──────────────────────────────────────
+# PowerShell with $ErrorActionPreference='Stop' treats any stderr line from a
+# native command (npm, pip, schtasks…) as a NativeCommandError and aborts the
+# script — even when the command itself succeeded. Wrap such calls in
+# Invoke-Native so warnings on stderr are tolerated and only $LASTEXITCODE
+# decides success.
+function Invoke-Native {
+    param([Parameter(Mandatory=$true, Position=0)][scriptblock]$ScriptBlock)
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $hasNativeEAP = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -ErrorAction SilentlyContinue)
+    $prevNativeEAP = $null
+    if ($hasNativeEAP) {
+        $prevNativeEAP = $Global:PSNativeCommandUseErrorActionPreference
+        $Global:PSNativeCommandUseErrorActionPreference = $false
+    }
+    try {
+        & $ScriptBlock 2>&1 | Out-Null
+    } catch {
+        # stderr surfaced as ErrorRecord on some PS versions — exit code is the truth
+    } finally {
+        $ErrorActionPreference = $prevEAP
+        if ($hasNativeEAP) { $Global:PSNativeCommandUseErrorActionPreference = $prevNativeEAP }
+    }
+    return ($LASTEXITCODE -eq 0)
+}
+
+# ─── UTF-8 without BOM ──────────────────────────────────────────
+# PowerShell 5.1's `Set-Content -Encoding UTF8` writes a BOM, which breaks
+# Pi Agent's JSON parser. Use this helper for any file that another tool
+# will read as UTF-8 (JSON configs, embedded scripts).
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory=$true, Position=0)][string]$Path,
+        [Parameter(Mandatory=$true, Position=1)][string]$Content
+    )
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 # ─── Step header ────────────────────────────────────────────────
 $TOTAL_STEPS = 10
 function Step-Header {
@@ -259,10 +299,12 @@ function Ensure-Winget {
 function Winget-Install {
     param([string]$id, [string]$friendlyName)
     info "Installing $friendlyName..."
-    $args = @('install', '-e', '--id', $id, '--silent',
+    # Use $wingetArgs (not $args) — $args is an automatic PS variable that
+    # gets shadowed inside script blocks, breaking splatting through Invoke-Native.
+    $wingetArgs = @('install', '-e', '--id', $id, '--silent',
               '--accept-package-agreements', '--accept-source-agreements',
               '--disable-interactivity', '--scope', 'user')
-    & winget @args 2>&1 | Out-Null
+    [void](Invoke-Native { & winget @wingetArgs }.GetNewClosure())
     if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189) {
         # -1978335189 = APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE (already installed)
         warn "$friendlyName winget exit code $LASTEXITCODE (continuing — may already be installed)"
@@ -300,22 +342,60 @@ function Install-Deps {
     info "Installing Pi Coding Agent..."
     $piCheck = Get-Command pi -ErrorAction SilentlyContinue
     if (-not $piCheck) {
-        & npm install -g '@mariozechner/pi-coding-agent' 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            warn "npm install pi-coding-agent failed. Try manually: npm install -g @mariozechner/pi-coding-agent"
-        } else {
+        if (Invoke-Native { & npm install -g '@mariozechner/pi-coding-agent' --silent }) {
             ok "Pi Agent installed"
+        } else {
+            warn "npm install pi-coding-agent failed (exit $LASTEXITCODE). Try manually: npm install -g @mariozechner/pi-coding-agent"
         }
     } else {
         ok "Pi Agent already installed"
     }
 
-    info "Installing edge-tts (voice output)..."
     $pyCmd = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
-    & $pyCmd -m pip install --user --quiet edge-tts 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) { ok "edge-tts installed" } else { warn "edge-tts install failed (voice output may not work)" }
+    $pipCommonFlags = @('--user', '--quiet', '--no-warn-script-location', '--disable-pip-version-check')
+
+    info "Installing edge-tts (voice output)..."
+    if (Invoke-Native { & $pyCmd -m pip install @pipCommonFlags edge-tts }.GetNewClosure()) {
+        ok "edge-tts installed"
+    } else {
+        warn "edge-tts install failed (voice output may not work)"
+    }
+
+    info "Installing openai-whisper (voice input)..."
+    if (Invoke-Native { & $pyCmd -m pip install @pipCommonFlags openai-whisper }.GetNewClosure()) {
+        ok "openai-whisper installed"
+    } else {
+        warn "openai-whisper install failed (Groq Whisper API will still work — local fallback only)"
+    }
+
+    if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+        Winget-Install 'Gyan.FFmpeg' 'FFmpeg (audio decoding for whisper)'
+    } else {
+        ok "FFmpeg already installed"
+    }
+
+    # Add Python user Scripts dir to PATH so edge-tts / whisper resolve in fresh shells.
+    Add-PythonUserScriptsToPath $pyCmd
 
     Refresh-Path
+}
+
+# Append Python's user-site Scripts dir to user PATH (it's where pip --user
+# drops console scripts on Windows; missing from PATH by default).
+function Add-PythonUserScriptsToPath {
+    param([string]$pyCmd)
+    $scriptsDir = $null
+    try {
+        $scriptsDir = (& $pyCmd -c "import sysconfig; print(sysconfig.get_path('scripts', f'{sysconfig.get_default_scheme()}_user'))" 2>$null).Trim()
+    } catch {}
+    if (-not $scriptsDir -or -not (Test-Path $scriptsDir)) { return }
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if ($userPath -notlike "*$scriptsDir*") {
+        $newPath = if ($userPath) { "$userPath;$scriptsDir" } else { $scriptsDir }
+        [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+        $env:Path = "$($env:Path);$scriptsDir"
+        ok "Added Python user Scripts dir to PATH: $scriptsDir"
+    }
 }
 
 # ─── Verify API key ─────────────────────────────────────────────
@@ -343,6 +423,15 @@ function Verify-ProviderKey {
             -Headers $headers -Body $body -TimeoutSec 30
         return $true
     } catch {
+        $status = $null
+        try { $status = $_.Exception.Response.StatusCode.value__ } catch {}
+        if ($status -eq 401 -or $status -eq 403) {
+            $script:LAST_KEY_ERROR = "$($script:PROVIDER_LABEL) rejected the key (HTTP $status — Authentication failed). Check there are no extra spaces or a wrong key."
+        } elseif ($status) {
+            $script:LAST_KEY_ERROR = "$($script:PROVIDER_LABEL) returned HTTP $status during verification."
+        } else {
+            $script:LAST_KEY_ERROR = "Could not reach $($script:PROVIDER_LABEL) ($($_.Exception.Message))."
+        }
         return $false
     }
 }
@@ -394,16 +483,30 @@ function Collect-Info {
     Write-Host "  ${DIM}$($script:PROVIDER_NOTE)${NC}"
     Write-Host ""
 
+    $verified = $false
     do {
-        $script:PROVIDER_KEY = Read-Host "  $($script:PROVIDER_LABEL) $($script:L_lbl_api_key)"
+        $rawKey = Read-Host "  $($script:PROVIDER_LABEL) $($script:L_lbl_api_key)"
+        $script:PROVIDER_KEY = if ($rawKey) { $rawKey.Trim() } else { '' }
         if ([string]::IsNullOrWhiteSpace($script:PROVIDER_KEY)) {
             Write-Host "  ${RED}⚠ $($script:PROVIDER_LABEL) $($script:L_lbl_api_key) — $($script:L_required)${NC}"
             Write-Host "  ${DIM}  $($script:L_signup_at) $($script:PROVIDER_URL), $($script:L_create_paste).${NC}"
+            continue
         }
-    } while ([string]::IsNullOrWhiteSpace($script:PROVIDER_KEY))
+        info $script:L_verifying
+        if (Verify-ProviderKey $script:PROVIDER_KEY) {
+            $verified = $true
+        } else {
+            Write-Host "  ${RED}⚠ $($script:LAST_KEY_ERROR)${NC}"
+            Write-Host "  ${DIM}  Try again, or press Enter on an empty key to continue with manual setup.${NC}"
+            $retry = Read-Host "  Retry? [Y/n]"
+            if ($retry -match '^(n|no)$') {
+                $script:PROVIDER_KEY = ''
+                break
+            }
+        }
+    } while (-not $verified)
 
-    info $script:L_verifying
-    if (Verify-ProviderKey $script:PROVIDER_KEY) {
+    if ($verified) {
         ok "$($script:PROVIDER_LABEL) $($script:L_key_works)"
         Write-Host ""
         Write-Host "  ${GREEN}${BOLD}  🍃 $($script:L_ai_activated)${NC}"
@@ -762,7 +865,7 @@ function Configure-Pi {
     if ($script:GEMINI_KEY) {
         $auth['google'] = @{ type = 'api_key'; key = $script:GEMINI_KEY }
     }
-    $auth | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'auth.json') -Encoding UTF8
+    Write-Utf8NoBom (Join-Path $piHome 'auth.json') ($auth | ConvertTo-Json -Depth 5)
 
     # telegram.json — schema MUST match install.sh / pi-telegram TelegramConfig:
     # { botToken: string, allowedUserId: number, lastUpdateId: number }
@@ -771,7 +874,7 @@ function Configure-Pi {
         allowedUserId = [int64]$script:TG_USER_ID
         lastUpdateId = 0
     }
-    $tg | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'telegram.json') -Encoding UTF8
+    Write-Utf8NoBom (Join-Path $piHome 'telegram.json') ($tg | ConvertTo-Json -Depth 5)
 
     # settings.json — pi schema uses `packages` for git/npm extensions, not `extensions`
     $settingsObj = @{
@@ -786,7 +889,7 @@ function Configure-Pi {
     } else {
         warn "Git Bash not found at $gitBash. Pi Agent may need manual shell configuration."
     }
-    $settingsObj | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $piHome 'settings.json') -Encoding UTF8
+    Write-Utf8NoBom (Join-Path $piHome 'settings.json') ($settingsObj | ConvertTo-Json -Depth 5)
 
     ok "Pi Agent configured"
 }
@@ -998,13 +1101,25 @@ Frozen. To update an existing fact, mark old line with ``(ended: YYYY-MM-DD)`` a
 
     # run.cmd — schtasks invokes this on logon. Builds the system prompt
     # by concatenating IDENTITY.md + MEMORY.md + frozen pages, then exec'ing pi.
+    # Single-instance guard: a lockfile prevents a second concurrent start
+    # (a second logon, double-click on run.cmd, or `mavka start`). A stale
+    # lock from a crash blocks one start — user clears it via `mavka stop`
+    # or `del mavka.lock`. The Task Scheduler ONLOGON trigger also has
+    # `MultipleInstancesPolicy=IgnoreNew` semantics by default.
     $runCmd = @"
 @echo off
 setlocal
 cd /d "%USERPROFILE%\mavka-bot"
+
+if exist mavka.lock (
+    echo %DATE% %TIME%: lockfile present — MavKa already running. To override: del "%USERPROFILE%\mavka-bot\mavka.lock" >> mavka.log
+    exit /b 0
+)
+
+> mavka.lock echo started %DATE% %TIME%
 echo %DATE% %TIME%: Starting MavKa... >> mavka.log
 
-where pi >nul 2>&1 || (echo pi command not on PATH >> mavka.log & exit /b 1)
+where pi >nul 2>&1 || (echo pi command not on PATH >> mavka.log & del mavka.lock >nul 2>&1 & exit /b 1)
 
 set PROMPT_FILE=%TEMP%\mavka-prompt.md
 copy /Y "%USERPROFILE%\mavka-bot\IDENTITY.md" "%PROMPT_FILE%" >nul
@@ -1031,10 +1146,12 @@ for %%F in ("%USERPROFILE%\mavka-bot\memory\feedback_*.md") do (
 )
 
 pi --provider $($script:PROVIDER_PI_NAME) --model $($script:PROVIDER_RUN_MODEL) --append-system-prompt "%PROMPT_FILE%" >> mavka.log 2>&1
+
+del mavka.lock >nul 2>&1
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'run.cmd') -Value $runCmd -Encoding ASCII
 
-    # mavka.cmd — user-facing wrapper (start/stop/logs/attach)
+    # mavka.cmd — user-facing wrapper (start/stop/logs/doctor/...)
     $mavkaCmd = @"
 @echo off
 setlocal
@@ -1048,7 +1165,11 @@ if /i "%ACTION%"=="start" (
 )
 if /i "%ACTION%"=="stop" (
     schtasks /End /TN "MavKa" >nul 2>&1
-    taskkill /IM pi.exe /F >nul 2>&1
+    rem Kill any node.exe whose command line includes the mavka-bot folder.
+    rem (Pi runs as ``node ...pi-coding-agent...`` — there is no pi.exe.)
+    powershell -NoProfile -Command ^
+      "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { `$_.CommandLine -match 'mavka-bot|pi-coding-agent' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }"
+    if exist "%USERPROFILE%\mavka-bot\mavka.lock" del "%USERPROFILE%\mavka-bot\mavka.lock" >nul 2>&1
     echo MavKa stopped.
     goto :eof
 )
@@ -1066,6 +1187,10 @@ if /i "%ACTION%"=="restart" (
     call "%~f0" start
     goto :eof
 )
+if /i "%ACTION%"=="doctor" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\doctor.ps1"
+    goto :eof
+)
 if /i "%ACTION%"=="uninstall" (
     schtasks /Delete /TN "MavKa" /F >nul 2>&1
     echo MavKa uninstalled. Files in %USERPROFILE%\mavka-bot remain — delete manually if desired.
@@ -1073,10 +1198,11 @@ if /i "%ACTION%"=="uninstall" (
 )
 echo MavKa control:
 echo   mavka start     — start the bot
-echo   mavka stop      — stop the bot
+echo   mavka stop      — stop the bot (kills node + clears lock)
 echo   mavka restart   — restart
 echo   mavka logs      — tail logs (Ctrl+C to stop)
 echo   mavka status    — scheduled task status
+echo   mavka doctor    — health check (Node, Python, Pi, FFmpeg, keys, Telegram)
 echo   mavka uninstall — remove scheduled task
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'mavka.cmd') -Value $mavkaCmd -Encoding ASCII
@@ -1150,7 +1276,7 @@ if /i "%PROV%"=="tavily" (
 )
 
 powershell -NoProfile -Command ^
-  "$j = Get-Content '%AUTH%' -Raw | ConvertFrom-Json -AsHashtable; $j['%PROV%'] = @{type='api_key';key='%NEWKEY%'}; $j | ConvertTo-Json -Depth 5 | Set-Content '%AUTH%' -Encoding UTF8"
+  "`$j = Get-Content '%AUTH%' -Raw | ConvertFrom-Json -AsHashtable; `$j['%PROV%'] = @{type='api_key';key='%NEWKEY%'.Trim()}; `$u8 = New-Object System.Text.UTF8Encoding `$false; [System.IO.File]::WriteAllText('%AUTH%', (`$j | ConvertTo-Json -Depth 5), `$u8)"
 echo + %PROV% key updated in auth.json
 
 :restart
@@ -1169,6 +1295,143 @@ exit /b 1
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'setkey.cmd') -Value $setkeyCmd -Encoding ASCII
 
+    # doctor.ps1 — health-check command. Single-quoted here-string so the
+    # PowerShell body is written verbatim (no install-time interpolation).
+    $doctorPs1 = @'
+# MavKa Doctor — health check for Windows install.
+# Reports status of every dependency and config required for a working bot.
+$ErrorActionPreference = 'Continue'
+
+function Section { param($t); Write-Host "`n== $t ==" -ForegroundColor Cyan }
+function Pass    { param($m); Write-Host "  [OK]   $m" -ForegroundColor Green }
+function Warn    { param($m); Write-Host "  [WARN] $m" -ForegroundColor Yellow }
+function Fail    { param($m); Write-Host "  [FAIL] $m" -ForegroundColor Red }
+
+$mavkaHome = Join-Path $env:USERPROFILE 'mavka-bot'
+$piHome = Join-Path $env:USERPROFILE '.pi\agent'
+
+Write-Host "`nMavKa Doctor for Windows`n" -ForegroundColor Magenta
+
+Section "Toolchain"
+
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) { Pass "Node.js $((node --version) 2>$null)" } else { Fail "Node.js not on PATH" }
+
+$npm = Get-Command npm -ErrorAction SilentlyContinue
+if ($npm) { Pass "npm $((npm --version) 2>$null)" } else { Fail "npm not on PATH" }
+
+$py = Get-Command python -ErrorAction SilentlyContinue
+if (-not $py) { $py = Get-Command python3 -ErrorAction SilentlyContinue }
+if ($py) { Pass "Python $((& $py.Source --version) 2>&1 | Select-Object -First 1)" } else { Fail "Python not on PATH" }
+
+$pi = Get-Command pi -ErrorAction SilentlyContinue
+if ($pi) {
+    $piVer = (& pi --version 2>$null) | Select-Object -First 1
+    Pass "Pi Agent $piVer"
+} else {
+    Fail "Pi Agent not installed (npm install -g @mariozechner/pi-coding-agent)"
+}
+
+$ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
+if ($ffmpeg) { Pass "FFmpeg available" } else { Warn "FFmpeg not on PATH (voice messages may not decode)" }
+
+if ($py) {
+    $whisper = & $py.Source -m pip show openai-whisper 2>$null
+    if ($LASTEXITCODE -eq 0 -and $whisper) { Pass "openai-whisper installed" } else { Warn "openai-whisper not installed (Groq API still works)" }
+}
+
+Section "Pi configuration"
+
+if (-not (Test-Path $piHome)) {
+    Fail "$piHome missing — installer never ran or was interrupted"
+} else {
+    $auth = Join-Path $piHome 'auth.json'
+    $tg   = Join-Path $piHome 'telegram.json'
+    $stg  = Join-Path $piHome 'settings.json'
+
+    foreach ($f in @($auth, $tg, $stg)) {
+        if (-not (Test-Path $f)) { Fail "Missing $f"; continue }
+        $bytes = [System.IO.File]::ReadAllBytes($f) | Select-Object -First 3
+        $hasBom = ($bytes.Count -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+        if ($hasBom) {
+            Fail "$f has UTF-8 BOM (Pi cannot parse it). Re-run install.ps1 or resave the file UTF-8 without BOM."
+        } else {
+            try {
+                $null = Get-Content $f -Raw | ConvertFrom-Json -ErrorAction Stop
+                Pass "$([IO.Path]::GetFileName($f)) is valid JSON, no BOM"
+            } catch {
+                Fail "$f is not valid JSON: $($_.Exception.Message)"
+            }
+        }
+    }
+
+    if (Test-Path $auth) {
+        $a = Get-Content $auth -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($a) {
+            $providers = $a.PSObject.Properties.Name
+            if ($providers.Count -gt 0) {
+                Pass "auth.json has keys for: $($providers -join ', ')"
+            } else {
+                Warn "auth.json has no provider keys configured"
+            }
+        }
+    }
+
+    if (Test-Path $tg) {
+        $t = Get-Content $tg -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($t -and $t.botToken) { Pass "telegram.json: botToken set, allowedUserId=$($t.allowedUserId)" } else { Warn "telegram.json missing botToken or allowedUserId" }
+    }
+}
+
+Section "MavKa home"
+
+if (-not (Test-Path $mavkaHome)) {
+    Fail "$mavkaHome missing"
+} else {
+    Pass "$mavkaHome exists"
+    foreach ($f in 'IDENTITY.md','run.cmd','mavka.cmd','tts.cmd','whisper.cmd','setkey.cmd') {
+        if (Test-Path (Join-Path $mavkaHome $f)) { Pass $f } else { Fail "$f missing" }
+    }
+    $lock = Join-Path $mavkaHome 'mavka.lock'
+    if (Test-Path $lock) { Warn "mavka.lock present — run 'mavka stop' to clear if no node process is alive" }
+}
+
+Section "Process"
+
+$running = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match 'mavka-bot|pi-coding-agent' }
+if ($running) {
+    Pass "MavKa is running (PID $(($running | Select-Object -First 1).ProcessId))"
+} else {
+    Warn "MavKa is not running — start with: mavka start"
+}
+
+Section "Scheduled task"
+
+$task = schtasks /Query /TN MavKa /FO LIST 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Pass "Scheduled task 'MavKa' registered"
+} else {
+    Warn "No scheduled task 'MavKa' — re-run install.ps1 to set up autostart"
+}
+
+Section "Network keys"
+
+if (Test-Path (Join-Path $piHome 'auth.json')) {
+    $a = Get-Content (Join-Path $piHome 'auth.json') -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+    foreach ($prov in $a.PSObject.Properties) {
+        $p = $prov.Name
+        $k = $prov.Value.key
+        if (-not $k) { Warn "$p key empty"; continue }
+        if ($k -ne $k.Trim()) { Warn "$p key has leading/trailing whitespace — run: setkey.cmd $p <key>"; continue }
+        Pass "$p key looks clean (length $($k.Length))"
+    }
+}
+
+Write-Host "`nDoctor finished. If you see [FAIL] above, fix that first.`n" -ForegroundColor Magenta
+'@
+    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'doctor.ps1') $doctorPs1
+
     ok "MavKa home created at $($script:MAVKA_HOME)"
 }
 
@@ -1179,15 +1442,14 @@ function Setup-Autostart {
 
     $runCmd = Join-Path $script:MAVKA_HOME 'run.cmd'
 
-    # Delete existing task if any
-    & schtasks /Delete /TN 'MavKa' /F 2>&1 | Out-Null
+    # Delete existing task if any (ignore errors — task may not exist on first install)
+    [void](Invoke-Native { & schtasks /Delete /TN 'MavKa' /F })
 
     # Create new at-logon, user-level (no admin)
-    & schtasks /Create /TN 'MavKa' /TR "`"$runCmd`"" /SC ONLOGON /RL LIMITED /F 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    if (Invoke-Native { & schtasks /Create /TN 'MavKa' /TR "`"$runCmd`"" /SC ONLOGON /RL LIMITED /F }.GetNewClosure()) {
         ok "Autostart configured (runs on user logon)"
     } else {
-        warn "Could not register autostart. Run manually: $runCmd"
+        warn "Could not register autostart (exit $LASTEXITCODE). Run manually: $runCmd"
     }
 }
 
@@ -1195,20 +1457,28 @@ function Setup-Autostart {
 function First-Run {
     Write-Host ""
     Write-Host "${GREEN}${BOLD}  Starting MavKa...${NC}"
-    & schtasks /Run /TN 'MavKa' 2>&1 | Out-Null
+    [void](Invoke-Native { & schtasks /Run /TN 'MavKa' })
 
     Write-Host ""
     Write-Host "  ${GREEN}🍃 $($script:L_is_ready)${NC}"
     Write-Host "  ${DIM}$($script:L_say_hi)${NC}"
     Write-Host ""
-    Write-Host "  ${DIM}Control commands:${NC}"
+    Write-Host "  ${YELLOW}${BOLD}  ⚠  ONE LAST STEP — connect Telegram bridge${NC}"
+    Write-Host "  ${DIM}  Pi Agent needs you to authorize Telegram once. In a NEW PowerShell window:${NC}"
+    Write-Host "    ${WHITE}pi${NC}"
+    Write-Host "  ${DIM}  Then inside Pi, type:${NC}"
+    Write-Host "    ${WHITE}/telegram-connect${NC}"
+    Write-Host "  ${DIM}  After that, open Telegram and message your bot.${NC}"
+    Write-Host ""
+    Write-Host "  ${DIM}Control commands (run from a new PowerShell window):${NC}"
+    Write-Host "  ${DIM}  mavka doctor   — health check${NC}"
     Write-Host "  ${DIM}  mavka logs     — tail logs${NC}"
     Write-Host "  ${DIM}  mavka stop     — stop the bot${NC}"
     Write-Host "  ${DIM}  mavka restart  — restart${NC}"
     Write-Host "  ${DIM}  mavka uninstall — remove autostart${NC}"
     Write-Host ""
-    Write-Host "  ${DIM}Add to PATH for the 'mavka' command:${NC}"
-    Write-Host "  ${DIM}  $script:MAVKA_HOME${NC}"
+    Write-Host "  ${YELLOW}  If 'mavka' is not recognized — close this window and open a new PowerShell.${NC}"
+    Write-Host "  ${DIM}  PATH was updated; existing terminals don't see the change until restart.${NC}"
     Write-Host ""
 }
 
@@ -1219,7 +1489,22 @@ function Add-ToPath {
         $newPath = if ($userPath) { "$userPath;$($script:MAVKA_HOME)" } else { $script:MAVKA_HOME }
         [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
         $env:Path = "$($env:Path);$($script:MAVKA_HOME)"
-        ok "Added $($script:MAVKA_HOME) to user PATH (open a new terminal to use 'mavka' command)"
+        ok "Added $($script:MAVKA_HOME) to user PATH"
+    }
+
+    # Also drop a launcher into a directory that's always on PATH for
+    # Windows users (WindowsApps), so `mavka` works from any terminal
+    # immediately, without waiting for PATH propagation.
+    $shimDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    if (Test-Path $shimDir) {
+        $shim = Join-Path $shimDir 'mavka.cmd'
+        $shimContent = "@echo off`r`ncall `"$($script:MAVKA_HOME)\mavka.cmd`" %*`r`n"
+        try {
+            [System.IO.File]::WriteAllText($shim, $shimContent, (New-Object System.Text.ASCIIEncoding))
+            ok "Installed mavka launcher at $shim"
+        } catch {
+            info "Could not write launcher to $shim ($($_.Exception.Message)); fall back to $($script:MAVKA_HOME)\mavka.cmd"
+        }
     }
 }
 
