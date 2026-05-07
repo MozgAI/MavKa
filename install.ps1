@@ -89,10 +89,10 @@ function Sanitize-TelegramUserId {
     return $null
 }
 
-# ─── UTF-8 without BOM ──────────────────────────────────────────
+# ─── UTF-8 without BOM (for files read by other tools) ──────────
 # PowerShell 5.1's `Set-Content -Encoding UTF8` writes a BOM, which breaks
-# Pi Agent's JSON parser. Use this helper for any file that another tool
-# will read as UTF-8 (JSON configs, embedded scripts).
+# Pi Agent's JSON parser. Use this helper for JSON / config files that
+# external tools read as UTF-8 and expect no BOM.
 function Write-Utf8NoBom {
     param(
         [Parameter(Mandatory=$true, Position=0)][string]$Path,
@@ -100,6 +100,22 @@ function Write-Utf8NoBom {
     )
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
+# ─── UTF-8 WITH BOM (for .ps1 files read by Windows PowerShell 5.1) ──
+# powershell.exe (PS 5.1) reads .ps1 source as Windows-1252 unless a
+# BOM is present. A non-ASCII char in a string (em-dash, arrow, block,
+# emoji) gets misinterpreted into multiple cp1252 chars, one of which
+# is often a typographic quote `0x94` that prematurely closes the
+# string and breaks parsing. Use this helper for every .ps1 we ship
+# that contains non-ASCII characters.
+function Write-Utf8WithBom {
+    param(
+        [Parameter(Mandatory=$true, Position=0)][string]$Path,
+        [Parameter(Mandatory=$true, Position=1)][string]$Content
+    )
+    $utf8WithBom = New-Object System.Text.UTF8Encoding($true)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8WithBom)
 }
 
 # ─── Step header ────────────────────────────────────────────────
@@ -1476,7 +1492,7 @@ else                       { $emoji = '🤬' }
 
 Write-Output ('`' + $bar + ' ' + $tk + 'K/200K ' + $emoji + '`')
 '@
-    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
+    Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
 
     # setkey.cmd — thin shim that delegates the JSON munging to setkey.ps1.
     # Keeps the cmd file free of fragile PowerShell quoting and runs cleanly
@@ -1536,7 +1552,7 @@ Write-Host "+ $Provider key updated in auth.json"
 & "$env:USERPROFILE\mavka-bot\mavka.cmd" restart
 exit 0
 '@
-    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'setkey.ps1') $setkeyPs1
+    Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'setkey.ps1') $setkeyPs1
 
     # doctor.ps1 — health-check command. Single-quoted here-string so the
     # PowerShell body is written verbatim (no install-time interpolation).
@@ -1691,7 +1707,7 @@ if ($script:DocFails -gt 0) {
     exit 0
 }
 '@
-    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'doctor.ps1') $doctorPs1
+    Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'doctor.ps1') $doctorPs1
 
     ok "MavKa home created at $($script:MAVKA_HOME)"
 }
