@@ -1048,6 +1048,16 @@ When the user explicitly asks to switch ("answer in English", "ответь по
 - File system access on the user's machine
 - Memory recall: `recall.cmd "query"` (search wiki + history + summaries)
 - Hot-swap API key: `setkey.cmd <provider> <new_key>` (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
+- Token statusline: `token.cmd` (returns one line with context-usage bar + emoji; only invoke on the explicit "токен" trigger below)
+
+## "Token" trigger — one-line context-usage bar
+
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line in backticks** — the verbatim output of `token.cmd`. No prefix, no greeting, no commentary. Example:
+
+User: `токен`
+You: `█████████░ 184K/200K 😨`
+
+The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
 ## Formatting — Telegram sends with parse_mode=HTML
 
@@ -1399,6 +1409,75 @@ if /i "%MODE%"=="--british" (
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'whisper.cmd') -Value $whisperCmd -Encoding ASCII
 
+    # token.cmd / token.ps1 — context-usage indicator. Reads the latest Pi
+    # session JSONL, sums message.usage.input + message.usage.output, renders
+    # a 10-block bar + emoji per the etiquette scale. Triggered from IDENTITY
+    # when the user types the standalone word "токен" / "token".
+    $tokenCmd = @"
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\token.ps1"
+"@
+    Set-Content -Path (Join-Path $script:MAVKA_HOME 'token.cmd') -Value $tokenCmd -Encoding ASCII
+
+    $tokenPs1 = @'
+# MavKa token statusline. Output: `<bar> <K>K/200K <emoji>` on one line.
+$ErrorActionPreference = 'Continue'
+$limit = 200000
+$total = 0
+
+$sessionsRoot = Join-Path $env:USERPROFILE '.pi\agent\sessions'
+if (Test-Path $sessionsRoot) {
+    # Pi Agent slugs the cwd into the session-dir name; we ran pi from
+    # ~/mavka-bot, so the dir contains "mavka-bot". Walk those dirs and
+    # pick the most recently written .jsonl across all of them.
+    $latest = Get-ChildItem -Path $sessionsRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*mavka-bot*' } |
+        ForEach-Object { Get-ChildItem -Path $_.FullName -Filter '*.jsonl' -File -ErrorAction SilentlyContinue } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($latest) {
+        Get-Content -LiteralPath $latest.FullName -Encoding UTF8 -ErrorAction SilentlyContinue | ForEach-Object {
+            if (-not $_) { return }
+            try {
+                $obj = $_ | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                return
+            }
+            $usage = $null
+            if ($obj.PSObject.Properties['message']) {
+                $msg = $obj.message
+                if ($msg -and $msg.PSObject.Properties['usage']) { $usage = $msg.usage }
+            }
+            if (-not $usage) { return }
+            $inTok  = if ($usage.PSObject.Properties['input'])  { [int]$usage.input  } else { 0 }
+            $outTok = if ($usage.PSObject.Properties['output']) { [int]$usage.output } else { 0 }
+            $total += $inTok + $outTok
+        }
+    }
+}
+
+$pct = [int]([math]::Floor(($total * 100.0) / $limit))
+if ($pct -gt 100) { $pct = 100 }
+$blocks = [int]([math]::Floor($pct / 10.0))
+if ($blocks -lt 0)  { $blocks = 0 }
+if ($blocks -gt 10) { $blocks = 10 }
+$bar = ('█' * $blocks) + ('░' * (10 - $blocks))
+
+$tk = [int]([math]::Floor($total / 1000.0))
+
+if     ($total -le 100000) { $emoji = '😇' }
+elseif ($total -le 150000) { $emoji = '🤓' }
+elseif ($total -le 180000) { $emoji = '😳' }
+elseif ($total -le 190000) { $emoji = '😨' }
+elseif ($total -le 200000) { $emoji = '😱' }
+elseif ($total -le 250000) { $emoji = '🤯' }
+else                       { $emoji = '🤬' }
+
+Write-Output ('`' + $bar + ' ' + $tk + 'K/200K ' + $emoji + '`')
+'@
+    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
+
     # setkey.cmd — thin shim that delegates the JSON munging to setkey.ps1.
     # Keeps the cmd file free of fragile PowerShell quoting and runs cleanly
     # on Windows PowerShell 5.1 (no -AsHashtable / PS 7-only features).
@@ -1555,7 +1634,7 @@ if (-not (Test-Path $mavkaHome)) {
     Fail "$mavkaHome missing"
 } else {
     Pass "$mavkaHome exists"
-    foreach ($f in 'IDENTITY.md','run.cmd','mavka.cmd','tts.cmd','whisper.cmd','setkey.cmd','setkey.ps1','doctor.ps1') {
+    foreach ($f in 'IDENTITY.md','run.cmd','mavka.cmd','tts.cmd','whisper.cmd','setkey.cmd','setkey.ps1','doctor.ps1','token.cmd','token.ps1') {
         if (Test-Path (Join-Path $mavkaHome $f)) { Pass $f } else { Fail "$f missing" }
     }
     $lock = Join-Path $mavkaHome 'mavka.lock'

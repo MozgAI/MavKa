@@ -1203,6 +1203,16 @@ For 2-3 columns of simple data, prefer a bullet list with <b>bold</b> labels —
 - Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
 - Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
 - Hot-swap API key: \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`  (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
+- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns one line with context-usage bar + emoji; only invoke on the explicit "токен" trigger below)
+
+## "Token" trigger — one-line context-usage bar
+
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line in backticks** — the verbatim output of \`bash ~/mavka-bot/token.sh\`. No prefix, no greeting, no commentary. Example:
+
+User: \`токен\`
+You: \`█████████░ 184K/200K 😨\`
+
+The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
 ## "British" mode — instant voice-to-English translation
 
@@ -1610,6 +1620,65 @@ edge-tts --voice "en-US-AriaNeural" --text "$TEXT" --write-media "$OUTPUT" 2>/de
 { echo "Error: TTS failed"; exit 1; }
 TTSEOF
   chmod +x "$MAVKA_HOME/tts.sh"
+
+  # ── token.sh — context-usage indicator ──
+  # Triggered from IDENTITY when the user types the standalone word "токен" /
+  # "token". Reads the most recent Pi Agent session JSONL, sums message
+  # usage, renders a 10-block bar + emoji per the etiquette scale.
+  cat > "$MAVKA_HOME/token.sh" << 'TOKENEOF'
+#!/bin/bash
+# MavKa token statusline — one-line context usage indicator.
+# Output format: `<10-block bar> <K>K/200K <emoji>`
+LIMIT=200000
+
+# Find the most recent jsonl across any session dir whose name mentions the
+# mavka-bot working directory (Pi Agent slugs cwd into the session dir name).
+LATEST=$(ls -t "$HOME/.pi/agent/sessions"/*mavka-bot*/*.jsonl 2>/dev/null | head -1)
+if [ -z "$LATEST" ]; then
+    echo '`░░░░░░░░░░ 0K/200K 😇`'
+    exit 0
+fi
+
+TOTAL=$(python3 - "$LATEST" <<'PYEOF'
+import json, sys
+total = 0
+try:
+    with open(sys.argv[1]) as f:
+        for line in f:
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            usage = (obj.get("message") or {}).get("usage") or {}
+            total += int(usage.get("input") or 0) + int(usage.get("output") or 0)
+except FileNotFoundError:
+    pass
+print(total)
+PYEOF
+)
+[ -z "$TOTAL" ] && TOTAL=0
+
+PCT=$(( TOTAL * 100 / LIMIT ))
+[ "$PCT" -gt 100 ] && PCT=100
+BLOCKS=$(( PCT / 10 ))
+[ "$BLOCKS" -lt 0 ] && BLOCKS=0
+[ "$BLOCKS" -gt 10 ] && BLOCKS=10
+
+BAR=$(python3 -c "print('█' * $BLOCKS + '░' * (10 - $BLOCKS))")
+
+if   [ "$TOTAL" -le 100000 ]; then EMOJI='😇'
+elif [ "$TOTAL" -le 150000 ]; then EMOJI='🤓'
+elif [ "$TOTAL" -le 180000 ]; then EMOJI='😳'
+elif [ "$TOTAL" -le 190000 ]; then EMOJI='😨'
+elif [ "$TOTAL" -le 200000 ]; then EMOJI='😱'
+elif [ "$TOTAL" -le 250000 ]; then EMOJI='🤯'
+else                               EMOJI='🤬'
+fi
+
+TK=$(( TOTAL / 1000 ))
+echo "\`${BAR} ${TK}K/200K ${EMOJI}\`"
+TOKENEOF
+  chmod +x "$MAVKA_HOME/token.sh"
 
   # ── vision.sh ──
   cat > "$MAVKA_HOME/vision.sh" << 'VISIONEOF'
