@@ -1068,12 +1068,12 @@ When the user explicitly asks to switch ("answer in English", "ответь по
 
 ## "Token" trigger — one-line context-usage bar
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of `token.cmd` as plain text**, on a single line, with **no wrappers** — no markdown backticks, no `<code>` tags, no quotes. The block characters in the bar already provide the monospace visual; pi-telegram does not apply parse_mode formatting here, so any wrapper just shows up as literal characters and breaks the look.
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line wrapped in single markdown backticks** — the verbatim output of `token.cmd`. No prefix, no greeting, no commentary, nothing else on the line. pi-telegram renders backticks as a monospace span, which makes the block characters in the bar render at a uniform width (without backticks the bar looks textured/uneven on iOS).
 
 Example:
 
 User: токен
-You: █████████░ 184K/200K 😨
+You: `█████████░ 184K/200K 😨`
 
 The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
