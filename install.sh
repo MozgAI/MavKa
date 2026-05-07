@@ -1203,18 +1203,25 @@ For 2-3 columns of simple data, prefer a bullet list with <b>bold</b> labels —
 - Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
 - Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
 - Hot-swap API key: \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`  (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns one line — bar + counters + emoji; only invoke on the explicit "токен" trigger below)
+- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns TWO lines — backtick-wrapped bar + counters, then a phrase; only invoke on the explicit "токен" trigger below)
 
-## "Token" trigger — one-line context-usage bar
+## "Token" trigger — two-line context-usage indicator
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line wrapped in single markdown backticks** — the verbatim output of \`bash ~/mavka-bot/token.sh\`. No prefix, no greeting, no commentary, nothing else on the line. pi-telegram renders backticks as a monospace span, which makes the block characters in the bar render at a uniform width (without backticks the bar looks textured/uneven on iOS).
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of \`bash ~/mavka-bot/token.sh\`**. The script returns TWO lines:
+
+1. A backtick-wrapped bar plus counters (\`<bar> <K>K/200K\`)
+2. A one-line Gilfoyle-deadpan phrase tied to the cube count
+
+Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, commentary, or asterisks. The backticks on line 1 are markdown — pi-telegram renders that line as monospace so the emoji squares align cleanly.
 
 Example:
 
 User: токен
-You: \`🟧🟧🟧🟧🟧🟧🟧🟧🟧⬛ 184K/200K\`
+You:
+\`🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 135K/200K\`
+RAM держится на кофеине и сексуальном напряжении
 
-The script renders a 10-block progress bar against a 200K context limit. The bar uses colored emoji squares: 🟩 green up to 100K, 🟨 yellow up to 150K, 🟧 orange up to 180K, 🟥 red beyond. Empty cells are ⬛. No mood face emoji at the end — the colour already signals load. The numbers and the bar come from the script — never make them up.
+Two-tone thermometer: every filled cube is the same colour, every empty cube is ⬛. Colour is chosen by cube count — 1-2 🟩 green, 3-5 🟨 yellow, 6-8 🟧 orange, 9-10 🟥 red. The phrase comes from a fixed table inside the script, indexed by cube count (0..10) plus an overflow line at 11, in the install language. Numbers, bar, and phrase all come from the script — never paraphrase or invent.
 
 ## "British" mode — instant voice-to-English translation
 
@@ -1623,25 +1630,25 @@ edge-tts --voice "en-US-AriaNeural" --text "$TEXT" --write-media "$OUTPUT" 2>/de
 TTSEOF
   chmod +x "$MAVKA_HOME/tts.sh"
 
-  # ── token.sh — context-usage indicator ──
+  # ── token.sh — context-usage indicator (two-tone thermometer) ──
   # Triggered from IDENTITY when the user types the standalone word "токен" /
   # "token". Reads the most recent Pi Agent session JSONL, sums message
-  # usage, renders a 10-block bar + emoji per the etiquette scale.
+  # usage, renders a 10-block bar in the load colour (green/yellow/orange/red)
+  # plus a Gilfoyle-deadpan one-liner per cube count in the user's language.
+  # Output is two lines: backtick-wrapped bar + counters, then the phrase.
   cat > "$MAVKA_HOME/token.sh" << 'TOKENEOF'
 #!/bin/bash
-# MavKa token statusline — one-line context usage indicator.
-# Output format: `<10-block bar> <K>K/200K <emoji>`
+# MavKa token statusline. Two-line output:
+#   line 1:  `<bar> <K>K/200K`         (in single backticks for monospace)
+#   line 2:  <phrase tied to cube count>
+LANG_CODE="__LANG__"
 LIMIT=200000
 
-# Find the most recent jsonl across any session dir whose name mentions the
-# mavka-bot working directory (Pi Agent slugs cwd into the session dir name).
 LATEST=$(ls -t "$HOME/.pi/agent/sessions"/*mavka-bot*/*.jsonl 2>/dev/null | head -1)
 if [ -z "$LATEST" ]; then
-    echo '`░░░░░░░░░░ 0K/200K 😇`'
-    exit 0
-fi
-
-TOTAL=$(python3 - "$LATEST" <<'PYEOF'
+    TOTAL=0
+else
+    TOTAL=$(python3 - "$LATEST" <<'PYEOF'
 import json, sys
 total = 0
 try:
@@ -1658,6 +1665,7 @@ except FileNotFoundError:
 print(total)
 PYEOF
 )
+fi
 [ -z "$TOTAL" ] && TOTAL=0
 
 PCT=$(( TOTAL * 100 / LIMIT ))
@@ -1666,20 +1674,132 @@ BLOCKS=$(( PCT / 10 ))
 [ "$BLOCKS" -lt 0 ] && BLOCKS=0
 [ "$BLOCKS" -gt 10 ] && BLOCKS=10
 
-# Color zone of filled cells reflects load: green / yellow / orange / red.
-# Empty cells are always ⬛. No trailing mood emoji — the colour itself
-# already says how stressed we should be.
-if   [ "$TOTAL" -le 100000 ]; then FILL='🟩'
-elif [ "$TOTAL" -le 150000 ]; then FILL='🟨'
-elif [ "$TOTAL" -le 180000 ]; then FILL='🟧'
-else                               FILL='🟥'
+# Two-tone bar: every filled cube is the same colour, every empty cube ⬛.
+# Colour by cube count: 0-2 green, 3-5 yellow, 6-8 orange, 9-10 red.
+if   [ "$BLOCKS" -le 2 ]; then FILL='🟩'
+elif [ "$BLOCKS" -le 5 ]; then FILL='🟨'
+elif [ "$BLOCKS" -le 8 ]; then FILL='🟧'
+else                            FILL='🟥'
 fi
 
 BAR=$(python3 -c "print('${FILL}' * $BLOCKS + '⬛' * (10 - $BLOCKS))")
-
 TK=$(( TOTAL / 1000 ))
-echo "${BAR} ${TK}K/200K"
+
+# Phrase index: 0..10 mapped to cube count, 11 reserved for overflow.
+if [ "$TOTAL" -gt "$LIMIT" ]; then
+    IDX=11
+else
+    IDX="$BLOCKS"
+fi
+
+# Gilfoyle-deadpan one-liners, indexed [0..11], in the install language.
+case "$LANG_CODE" in
+ru)
+    PHRASES=(
+        "Редкая форма невинности"
+        "Пока никто не облажался. Настораживает"
+        "Слишком спокойно. Где подвох?"
+        "Начинается управляемая деградация"
+        "Половина памяти ушла на чью-то «гениальную» идею"
+        "Уже пахнет горячим кремнием и плохими решениями"
+        "Оранжевый уровень. Кто-то трогал прод в пятницу"
+        "RAM держится на кофеине и сексуальном напряжении"
+        "Система стонет, но HR просил это так не называть"
+        "Контекст держится чисто из ненависти"
+        "Отличный момент обвинить инфраструктуру и исчезнуть"
+        "Я предупреждала. Но люди всегда думают членом, а не логами"
+    )
+    ;;
+uk)
+    PHRASES=(
+        "Рідкісна форма невинності"
+        "Поки ніхто не облажався. Насторожує"
+        "Занадто тихо. Де підступ?"
+        "Починається керована деградація"
+        "Половина памʼяті пішла на чиюсь «геніальну» ідею"
+        "Вже пахне гарячим кремнієм і поганими рішеннями"
+        "Помаранчевий рівень. Хтось чіпав прод у пʼятницю"
+        "RAM тримається на кофеїні й сексуальному напруженні"
+        "Система стогне, але HR просив це так не називати"
+        "Контекст тримається суто з ненависті"
+        "Чудовий момент звинуватити інфраструктуру і зникнути"
+        "Я попереджала. Але люди завжди думають членом, а не логами"
+    )
+    ;;
+de)
+    PHRASES=(
+        "Eine seltene Form der Unschuld"
+        "Noch hat's keiner versemmelt. Verdächtig"
+        "Zu ruhig. Wo ist der Haken?"
+        "Kontrollierte Degradation beginnt"
+        "Die Hälfte vom RAM ging für jemandes «geniale» Idee drauf"
+        "Riecht schon nach heißem Silizium und schlechten Entscheidungen"
+        "Orange-Stufe. Jemand hat freitags an Prod rumgespielt"
+        "RAM hält nur dank Koffein und sexueller Spannung"
+        "Das System ächzt, aber HR will, dass wir es anders nennen"
+        "Kontext hält rein aus Trotz"
+        "Perfekter Moment, der Infrastruktur die Schuld zu geben und zu verschwinden"
+        "Ich hab gewarnt. Aber die Leute denken immer mit dem Schwanz, nicht mit den Logs"
+    )
+    ;;
+fr)
+    PHRASES=(
+        "Une rare forme d'innocence"
+        "Personne n'a encore foiré. Suspect"
+        "Trop calme. Où est le piège?"
+        "La dégradation contrôlée commence"
+        "La moitié de la RAM est partie dans «l'idée géniale» de quelqu'un"
+        "Ça sent déjà le silicium chaud et les mauvaises décisions"
+        "Niveau orange. Quelqu'un a touché à la prod un vendredi"
+        "La RAM tient grâce à la caféine et la tension sexuelle"
+        "Le système gémit, mais les RH ont demandé de ne pas dire ça comme ça"
+        "Le contexte tient uniquement par dépit"
+        "Moment parfait pour accuser l'infrastructure et disparaître"
+        "Je t'avais prévenu. Mais les gens pensent toujours avec leur bite, pas avec leurs logs"
+    )
+    ;;
+es)
+    PHRASES=(
+        "Una rara forma de inocencia"
+        "Nadie la ha jodido aún. Sospechoso"
+        "Demasiado tranquilo. ¿Dónde está la trampa?"
+        "Empieza la degradación controlada"
+        "La mitad de la RAM se fue en la idea «genial» de alguien"
+        "Ya huele a silicio caliente y a malas decisiones"
+        "Nivel naranja. Alguien tocó producción un viernes"
+        "La RAM se sostiene a base de cafeína y tensión sexual"
+        "El sistema gime, pero RR.HH. pidió que no lo llamemos así"
+        "El contexto se mantiene puramente por rencor"
+        "Momento perfecto para echar la culpa a la infraestructura y desaparecer"
+        "Te lo advertí. Pero la gente siempre piensa con la polla, no con los logs"
+    )
+    ;;
+*)
+    PHRASES=(
+        "A rare form of innocence"
+        "Nobody has screwed up yet. Suspicious"
+        "Too quiet. Where's the catch?"
+        "Controlled degradation begins"
+        "Half the RAM went to someone's \"brilliant\" idea"
+        "Already smells like hot silicon and bad decisions"
+        "Orange level. Somebody touched prod on a Friday"
+        "RAM is held together by caffeine and sexual tension"
+        "The system is groaning, but HR asked us not to call it that"
+        "Context held purely out of spite"
+        "Perfect moment to blame infrastructure and vanish"
+        "I warned you. But people always think with their dick, not their logs"
+    )
+    ;;
+esac
+
+PHRASE="${PHRASES[$IDX]}"
+
+echo "\`${BAR} ${TK}K/200K\`"
+echo "${PHRASE}"
 TOKENEOF
+  # Bake the user's chosen install language into the script.
+  sed -i.bak "s|__LANG__|${BOT_LANG}|" "$MAVKA_HOME/token.sh"
+  rm -f "$MAVKA_HOME/token.sh.bak"
   chmod +x "$MAVKA_HOME/token.sh"
 
   # ── vision.sh ──

@@ -1064,18 +1064,25 @@ When the user explicitly asks to switch ("answer in English", "ответь по
 - File system access on the user's machine
 - Memory recall: `recall.cmd "query"` (search wiki + history + summaries)
 - Hot-swap API key: `setkey.cmd <provider> <new_key>` (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: `token.cmd` (returns one line — bar + counters + emoji; only invoke on the explicit "токен" trigger below)
+- Token statusline: `token.cmd` (returns TWO lines — backtick-wrapped bar + counters, then a phrase; only invoke on the explicit "токен" trigger below)
 
-## "Token" trigger — one-line context-usage bar
+## "Token" trigger — two-line context-usage indicator
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line wrapped in single markdown backticks** — the verbatim output of `token.cmd`. No prefix, no greeting, no commentary, nothing else on the line. pi-telegram renders backticks as a monospace span, which makes the block characters in the bar render at a uniform width (without backticks the bar looks textured/uneven on iOS).
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with the **verbatim output of `token.cmd`**. The script returns TWO lines:
+
+1. A backtick-wrapped bar plus counters (`<bar> <K>K/200K`)
+2. A one-line Gilfoyle-deadpan phrase tied to the cube count
+
+Send both lines as printed, in order, with no extra wrappers, prefixes, greetings, commentary, or asterisks. The backticks on line 1 are markdown — pi-telegram renders that line as monospace so the emoji squares align cleanly.
 
 Example:
 
 User: токен
-You: `🟧🟧🟧🟧🟧🟧🟧🟧🟧⬛ 184K/200K`
+You:
+`🟧🟧🟧🟧🟧🟧🟧⬛⬛⬛ 135K/200K`
+RAM держится на кофеине и сексуальном напряжении
 
-The script renders a 10-block progress bar against a 200K context limit. The bar uses colored emoji squares: 🟩 green up to 100K, 🟨 yellow up to 150K, 🟧 orange up to 180K, 🟥 red beyond. Empty cells are ⬛. No mood face emoji at the end — the colour already signals load. The numbers and the bar come from the script — never make them up.
+Two-tone thermometer: every filled cube is the same colour, every empty cube is ⬛. Colour is chosen by cube count — 1-2 🟩 green, 3-5 🟨 yellow, 6-8 🟧 orange, 9-10 🟥 red. The phrase comes from a fixed table inside the script, indexed by cube count (0..10) plus an overflow line at 11, in the install language. Numbers, bar, and phrase all come from the script — never paraphrase or invent.
 
 ## Formatting — Telegram sends with parse_mode=HTML
 
@@ -1437,17 +1444,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\tok
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'token.cmd') -Value $tokenCmd -Encoding ASCII
 
+    # token.ps1 — two-line context indicator. Single-quoted here-string so
+    # the body is verbatim; the "__LANG__" placeholder is substituted with
+    # the user's chosen install language before writing to disk.
     $tokenPs1 = @'
-# MavKa token statusline. Output: `<bar> <K>K/200K <emoji>` on one line.
+# MavKa token statusline. Two-line output:
+#   line 1:  `<bar> <K>K/200K`         (in single backticks for monospace)
+#   line 2:  <Gilfoyle-flavoured phrase tied to cube count>
 $ErrorActionPreference = 'Continue'
+$LangCode = '__LANG__'
 $limit = 200000
 $total = 0
 
 $sessionsRoot = Join-Path $env:USERPROFILE '.pi\agent\sessions'
 if (Test-Path $sessionsRoot) {
-    # Pi Agent slugs the cwd into the session-dir name; we ran pi from
-    # ~/mavka-bot, so the dir contains "mavka-bot". Walk those dirs and
-    # pick the most recently written .jsonl across all of them.
     $latest = Get-ChildItem -Path $sessionsRoot -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -like '*mavka-bot*' } |
         ForEach-Object { Get-ChildItem -Path $_.FullName -Filter '*.jsonl' -File -ErrorAction SilentlyContinue } |
@@ -1480,19 +1490,114 @@ if ($pct -gt 100) { $pct = 100 }
 $blocks = [int]([math]::Floor($pct / 10.0))
 if ($blocks -lt 0)  { $blocks = 0 }
 if ($blocks -gt 10) { $blocks = 10 }
-# Color zone of filled cells reflects load: green / yellow / orange / red.
-# Empty cells are always ⬛. No trailing mood emoji — the colour itself
-# already signals where we are.
-if     ($total -le 100000) { $fill = '🟩' }
-elseif ($total -le 150000) { $fill = '🟨' }
-elseif ($total -le 180000) { $fill = '🟧' }
-else                       { $fill = '🟥' }
+
+# Two-tone bar: every filled cube is the same colour, every empty cube ⬛.
+# Colour by cube count: 0-2 green, 3-5 yellow, 6-8 orange, 9-10 red.
+if     ($blocks -le 2) { $fill = '🟩' }
+elseif ($blocks -le 5) { $fill = '🟨' }
+elseif ($blocks -le 8) { $fill = '🟧' }
+else                   { $fill = '🟥' }
 
 $bar = ($fill * $blocks) + ('⬛' * (10 - $blocks))
 $tk = [int]([math]::Floor($total / 1000.0))
 
-Write-Output ($bar + ' ' + $tk + 'K/200K')
-'@
+# Index 0..10 = cube count, 11 reserved for overflow (>limit).
+$idx = if ($total -gt $limit) { 11 } else { $blocks }
+
+# Gilfoyle-deadpan phrases per language, indexed [0..11].
+$phrases = @{
+    'ru' = @(
+        'Редкая форма невинности',
+        'Пока никто не облажался. Настораживает',
+        'Слишком спокойно. Где подвох?',
+        'Начинается управляемая деградация',
+        'Половина памяти ушла на чью-то «гениальную» идею',
+        'Уже пахнет горячим кремнием и плохими решениями',
+        'Оранжевый уровень. Кто-то трогал прод в пятницу',
+        'RAM держится на кофеине и сексуальном напряжении',
+        'Система стонет, но HR просил это так не называть',
+        'Контекст держится чисто из ненависти',
+        'Отличный момент обвинить инфраструктуру и исчезнуть',
+        'Я предупреждала. Но люди всегда думают членом, а не логами'
+    )
+    'uk' = @(
+        'Рідкісна форма невинності',
+        'Поки ніхто не облажався. Насторожує',
+        'Занадто тихо. Де підступ?',
+        'Починається керована деградація',
+        'Половина памʼяті пішла на чиюсь «геніальну» ідею',
+        'Вже пахне гарячим кремнієм і поганими рішеннями',
+        'Помаранчевий рівень. Хтось чіпав прод у пʼятницю',
+        'RAM тримається на кофеїні й сексуальному напруженні',
+        'Система стогне, але HR просив це так не називати',
+        'Контекст тримається суто з ненависті',
+        'Чудовий момент звинуватити інфраструктуру і зникнути',
+        'Я попереджала. Але люди завжди думають членом, а не логами'
+    )
+    'de' = @(
+        'Eine seltene Form der Unschuld',
+        'Noch hat''s keiner versemmelt. Verdächtig',
+        'Zu ruhig. Wo ist der Haken?',
+        'Kontrollierte Degradation beginnt',
+        'Die Hälfte vom RAM ging für jemandes «geniale» Idee drauf',
+        'Riecht schon nach heißem Silizium und schlechten Entscheidungen',
+        'Orange-Stufe. Jemand hat freitags an Prod rumgespielt',
+        'RAM hält nur dank Koffein und sexueller Spannung',
+        'Das System ächzt, aber HR will, dass wir es anders nennen',
+        'Kontext hält rein aus Trotz',
+        'Perfekter Moment, der Infrastruktur die Schuld zu geben und zu verschwinden',
+        'Ich hab gewarnt. Aber die Leute denken immer mit dem Schwanz, nicht mit den Logs'
+    )
+    'fr' = @(
+        'Une rare forme d''innocence',
+        'Personne n''a encore foiré. Suspect',
+        'Trop calme. Où est le piège?',
+        'La dégradation contrôlée commence',
+        'La moitié de la RAM est partie dans «l''idée géniale» de quelqu''un',
+        'Ça sent déjà le silicium chaud et les mauvaises décisions',
+        'Niveau orange. Quelqu''un a touché à la prod un vendredi',
+        'La RAM tient grâce à la caféine et la tension sexuelle',
+        'Le système gémit, mais les RH ont demandé de ne pas dire ça comme ça',
+        'Le contexte tient uniquement par dépit',
+        'Moment parfait pour accuser l''infrastructure et disparaître',
+        'Je t''avais prévenu. Mais les gens pensent toujours avec leur bite, pas avec leurs logs'
+    )
+    'es' = @(
+        'Una rara forma de inocencia',
+        'Nadie la ha jodido aún. Sospechoso',
+        'Demasiado tranquilo. ¿Dónde está la trampa?',
+        'Empieza la degradación controlada',
+        'La mitad de la RAM se fue en la idea «genial» de alguien',
+        'Ya huele a silicio caliente y a malas decisiones',
+        'Nivel naranja. Alguien tocó producción un viernes',
+        'La RAM se sostiene a base de cafeína y tensión sexual',
+        'El sistema gime, pero RR.HH. pidió que no lo llamemos así',
+        'El contexto se mantiene puramente por rencor',
+        'Momento perfecto para echar la culpa a la infraestructura y desaparecer',
+        'Te lo advertí. Pero la gente siempre piensa con la polla, no con los logs'
+    )
+    'en' = @(
+        'A rare form of innocence',
+        'Nobody has screwed up yet. Suspicious',
+        'Too quiet. Where''s the catch?',
+        'Controlled degradation begins',
+        'Half the RAM went to someone''s "brilliant" idea',
+        'Already smells like hot silicon and bad decisions',
+        'Orange level. Somebody touched prod on a Friday',
+        'RAM is held together by caffeine and sexual tension',
+        'The system is groaning, but HR asked us not to call it that',
+        'Context held purely out of spite',
+        'Perfect moment to blame infrastructure and vanish',
+        'I warned you. But people always think with their dick, not their logs'
+    )
+}
+
+if (-not $phrases.ContainsKey($LangCode)) { $LangCode = 'en' }
+$phrase = $phrases[$LangCode][$idx]
+
+Write-Output ('`' + $bar + ' ' + $tk + 'K/200K' + '`')
+Write-Output $phrase
+'@ -replace '__LANG__', $script:BOT_LANG
     Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
 
     # setkey.cmd — thin shim that delegates the JSON munging to setkey.ps1.
