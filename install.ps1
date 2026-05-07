@@ -57,10 +57,14 @@ function Invoke-Native {
         $prevNativeEAP = $Global:PSNativeCommandUseErrorActionPreference
         $Global:PSNativeCommandUseErrorActionPreference = $false
     }
+    # Default to failure so a CommandNotFoundException (caught below) doesn't
+    # accidentally inherit a successful $LASTEXITCODE from the previous call.
+    $Global:LASTEXITCODE = 1
     try {
         & $ScriptBlock 2>&1 | Out-Null
     } catch {
         # stderr surfaced as ErrorRecord on some PS versions — exit code is the truth
+        $Global:LASTEXITCODE = 1
     } finally {
         $ErrorActionPreference = $prevEAP
         if ($hasNativeEAP) { $Global:PSNativeCommandUseErrorActionPreference = $prevNativeEAP }
@@ -1254,39 +1258,16 @@ if /i "%MODE%"=="--british" (
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'whisper.cmd') -Value $whisperCmd -Encoding ASCII
 
-    # setkey.cmd — hot-swap API key without re-running installer
+    # setkey.cmd — thin shim that delegates the JSON munging to setkey.ps1.
+    # Keeps the cmd file free of fragile PowerShell quoting and runs cleanly
+    # on Windows PowerShell 5.1 (no -AsHashtable / PS 7-only features).
     $setkeyCmd = @"
 @echo off
 setlocal
-set PROV=%~1
-set NEWKEY=%~2
-if "%PROV%"=="" goto usage
-if "%NEWKEY%"=="" goto usage
-
-set AUTH=%USERPROFILE%\.pi\agent\auth.json
-if not exist "%AUTH%" (
-    echo Error: %AUTH% not found
-    exit /b 1
-)
-
-if /i "%PROV%"=="tavily" (
-    powershell -NoProfile -Command "[Environment]::SetEnvironmentVariable('TAVILY_API_KEY','%NEWKEY%','User')"
-    echo + tavily key updated in user environment
-    goto restart
-)
-
-powershell -NoProfile -Command ^
-  "`$j = Get-Content '%AUTH%' -Raw | ConvertFrom-Json -AsHashtable; `$j['%PROV%'] = @{type='api_key';key='%NEWKEY%'.Trim()}; `$u8 = New-Object System.Text.UTF8Encoding `$false; [System.IO.File]::WriteAllText('%AUTH%', (`$j | ConvertTo-Json -Depth 5), `$u8)"
-echo + %PROV% key updated in auth.json
-
-:restart
-echo Restarting MavKa...
-schtasks /End /TN "MavKa" >nul 2>&1
-taskkill /IM pi.exe /F >nul 2>&1
-timeout /t 2 /nobreak >nul
-schtasks /Run /TN "MavKa" >nul 2>&1
-echo + MavKa restarted. New key is live.
-exit /b 0
+if "%~1"=="" goto usage
+if "%~2"=="" goto usage
+powershell -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\mavka-bot\setkey.ps1" -Provider "%~1" -NewKey "%~2"
+exit /b %ERRORLEVEL%
 
 :usage
 echo Usage: setkey.cmd ^<provider^> ^<new_key^>
@@ -1294,6 +1275,48 @@ echo Providers: deepseek, openai, anthropic, moonshotai, groq, google, tavily
 exit /b 1
 "@
     Set-Content -Path (Join-Path $script:MAVKA_HOME 'setkey.cmd') -Value $setkeyCmd -Encoding ASCII
+
+    # setkey.ps1 — does the actual work. Single-quoted here-string so the
+    # PowerShell body is written verbatim (no install-time interpolation).
+    $setkeyPs1 = @'
+param(
+    [Parameter(Mandatory=$true)][string]$Provider,
+    [Parameter(Mandatory=$true)][string]$NewKey
+)
+$ErrorActionPreference = 'Stop'
+
+$key = $NewKey.Trim()
+if (-not $key) { Write-Host "Error: empty key" -ForegroundColor Red; exit 1 }
+
+# tavily key lives in user env, not auth.json
+if ($Provider -ieq 'tavily') {
+    [Environment]::SetEnvironmentVariable('TAVILY_API_KEY', $key, 'User')
+    Write-Host "+ tavily key updated in user environment"
+    & "$env:USERPROFILE\mavka-bot\mavka.cmd" restart
+    exit 0
+}
+
+$auth = Join-Path $env:USERPROFILE '.pi\agent\auth.json'
+if (-not (Test-Path $auth)) {
+    Write-Host "Error: $auth not found" -ForegroundColor Red
+    exit 1
+}
+
+# PS 5.1 ConvertFrom-Json gives PSCustomObject; Add-Member -Force overwrites.
+# Avoid -AsHashtable (PS 7+ only).
+$j = Get-Content $auth -Raw | ConvertFrom-Json
+$entry = [PSCustomObject]@{ type = 'api_key'; key = $key }
+$j | Add-Member -NotePropertyName $Provider -NotePropertyValue $entry -Force
+
+$u8 = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($auth, ($j | ConvertTo-Json -Depth 5), $u8)
+Write-Host "+ $Provider key updated in auth.json"
+
+# Restart MavKa so the new key is live.
+& "$env:USERPROFILE\mavka-bot\mavka.cmd" restart
+exit 0
+'@
+    Write-Utf8NoBom (Join-Path $script:MAVKA_HOME 'setkey.ps1') $setkeyPs1
 
     # doctor.ps1 — health-check command. Single-quoted here-string so the
     # PowerShell body is written verbatim (no install-time interpolation).
