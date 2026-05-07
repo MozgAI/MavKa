@@ -1203,14 +1203,16 @@ For 2-3 columns of simple data, prefer a bullet list with <b>bold</b> labels —
 - Memory recall: \`bash ~/mavka-bot/recall.sh "query"\`  (search across the wiki, chat history, and distilled summaries)
 - Memory lint: \`bash ~/mavka-bot/lint.sh\`  (audit pages — run when the user asks "проверь память")
 - Hot-swap API key: \`bash ~/mavka-bot/setkey.sh <provider> <new_key>\`  (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns one line with context-usage bar + emoji; only invoke on the explicit "токен" trigger below)
+- Token statusline: \`bash ~/mavka-bot/token.sh\`  (returns one line — bar + counters + emoji; only invoke on the explicit "токен" trigger below)
 
 ## "Token" trigger — one-line context-usage bar
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line in backticks** — the verbatim output of \`bash ~/mavka-bot/token.sh\`. No prefix, no greeting, no commentary. Example:
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line wrapped in <code>...</code>** — the verbatim output of \`bash ~/mavka-bot/token.sh\`. No prefix, no greeting, no commentary. Use \`<code>\` HTML tag (Telegram parse_mode=HTML) — NOT markdown backticks; backticks would render as literal characters in the chat.
 
-User: \`токен\`
-You: \`█████████░ 184K/200K 😨\`
+Example:
+
+User: токен
+You: <code>█████████░ 184K/200K 😨</code>
 
 The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
@@ -1676,7 +1678,7 @@ else                               EMOJI='🤬'
 fi
 
 TK=$(( TOTAL / 1000 ))
-echo "\`${BAR} ${TK}K/200K ${EMOJI}\`"
+echo "${BAR} ${TK}K/200K ${EMOJI}"
 TOKENEOF
   chmod +x "$MAVKA_HOME/token.sh"
 

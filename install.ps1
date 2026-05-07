@@ -1064,14 +1064,16 @@ When the user explicitly asks to switch ("answer in English", "ответь по
 - File system access on the user's machine
 - Memory recall: `recall.cmd "query"` (search wiki + history + summaries)
 - Hot-swap API key: `setkey.cmd <provider> <new_key>` (deepseek/openai/anthropic/moonshotai/groq/google/tavily)
-- Token statusline: `token.cmd` (returns one line with context-usage bar + emoji; only invoke on the explicit "токен" trigger below)
+- Token statusline: `token.cmd` (returns one line — bar + counters + emoji; only invoke on the explicit "токен" trigger below)
 
 ## "Token" trigger — one-line context-usage bar
 
-When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line in backticks** — the verbatim output of `token.cmd`. No prefix, no greeting, no commentary. Example:
+When the user writes the word **"токен"** / **"token"** as a STANDALONE message (not inside a sentence like "сколько у нас токенов" — those are normal questions, answer them in prose), reply with **exactly one line wrapped in <code>...</code>** — the verbatim output of `token.cmd`. No prefix, no greeting, no commentary. Use `<code>` HTML tag (Telegram parse_mode=HTML) — NOT markdown backticks; backticks would render as literal characters in the chat.
 
-User: `токен`
-You: `█████████░ 184K/200K 😨`
+Example:
+
+User: токен
+You: <code>█████████░ 184K/200K 😨</code>
 
 The script renders a 10-block progress bar against a 200K context limit, plus a mood emoji from this scale: 😇 (≤100K) → 🤓 (≤150K) → 😳 (≤180K) → 😨 (≤190K) → 😱 (≤200K) → 🤯 (≤250K) → 🤬 (over). The emoji and number come from the script — never make them up.
 
@@ -1490,7 +1492,7 @@ elseif ($total -le 200000) { $emoji = '😱' }
 elseif ($total -le 250000) { $emoji = '🤯' }
 else                       { $emoji = '🤬' }
 
-Write-Output ('`' + $bar + ' ' + $tk + 'K/200K ' + $emoji + '`')
+Write-Output ($bar + ' ' + $tk + 'K/200K ' + $emoji)
 '@
     Write-Utf8WithBom (Join-Path $script:MAVKA_HOME 'token.ps1') $tokenPs1
 
