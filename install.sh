@@ -2793,10 +2793,12 @@ elif new_prefix in content:
 else:
     print("⚠ TELEGRAM_PREFIX line not in expected form — skipping prefix hide")
 
-# 4. MavKa 🍃 brand spinner — replace pi's default braille spinner
-# (⠋⠙⠹...) with leaf bouncing left-right. Runs INDEPENDENTLY of
-# the startPolling injection above so it works even when session_start
-# already calls startPolling on its own. Idempotent — only injects
+# 4. MavKa breath spinner — replace pi's default braille spinner
+# (⠋⠙⠹...) with a 4-state circle pulsing on a breath-like rhythm:
+# rest (◌) → inhale (◍) → peak (◎) → exhale (◍) → back to rest.
+# Asymmetric phase counts at 200 ms/frame give a 3.4 s cycle that
+# reads as breath (not a metronome). ANSI escape colours every frame
+# in MavKa's brand green (256-colour 71). Idempotent — only injects
 # if "setWorkingIndicator" is not already present.
 if "setWorkingIndicator" not in content:
     m2 = session_start_re.search(content)
@@ -2806,11 +2808,21 @@ if "setWorkingIndicator" not in content:
         m_indent2 = re.search(r'\n([ \t]+)\S', body2)
         if m_indent2:
             indent2 = m_indent2.group(1)
+        # Build frame list inline so it's readable in the patched output.
+        # G + symbol + RESET — green wraps each frame so colour stays
+        # exactly while the symbol cycles. Pi's loader renders frames
+        # verbatim (no theme colour override) when an indicator is set.
         spinner_block = (
             f"\n{indent2}if ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {{\n"
+            f"{indent2}\tconst G = '\\u001b[38;5;71m', N = '\\u001b[0m';\n"
             f"{indent2}\t(ctx as any).ui.setWorkingIndicator({{\n"
-            f"{indent2}\t\tframes: ['🍃', '🌳', '🍃', '🌲', '🍃', '🌿', '🍃', '🍀', '🍃'],\n"
-            f"{indent2}\t\tintervalMs: 180,\n"
+            f"{indent2}\t\tframes: [\n"
+            f"{indent2}\t\t\tG+'◌'+N, G+'◌'+N, G+'◌'+N, G+'◌'+N, G+'◌'+N,  // rest 1.0s\n"
+            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N, G+'◍'+N,                  // inhale 0.6s\n"
+            f"{indent2}\t\t\tG+'◎'+N, G+'◎'+N, G+'◎'+N, G+'◎'+N, G+'◎'+N,  // peak 1.0s\n"
+            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N, G+'◍'+N, G+'◍'+N,            // exhale 0.8s\n"
+            f"{indent2}\t\t],\n"
+            f"{indent2}\t\tintervalMs: 200,\n"
             f"{indent2}\t}});\n"
             f"{indent2}}}"
         )
