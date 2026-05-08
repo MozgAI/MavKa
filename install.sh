@@ -47,6 +47,28 @@ ok()   { echo -e "  ${GREEN}✓${NC} ${GREY}$1${NC}"; }
 warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
 fail() { echo -e "\n${RED}✗ $1${NC}"; exit 1; }
 
+# Show an external sign-up / registration URL on its own line, in a
+# distinct color so the user can see EXACTLY what to copy/scan. Pure
+# text fallback if `qrencode` is missing — most users won't have it,
+# but those who do get a free QR for mobile scan.
+show_url() {
+    local label="$1"
+    local url="$2"
+    # normalise to a full https://... URL for the QR (label keeps the short form)
+    local full="$url"
+    case "$full" in
+        http://*|https://*) ;;
+        *) full="https://$full" ;;
+    esac
+    echo ""
+    echo -e "    ${WHITE}${BOLD}${label}${NC}"
+    echo -e "      ${CYAN}${BOLD}${full}${NC}"
+    if command -v qrencode >/dev/null 2>&1; then
+        qrencode -t ANSI -m 1 "$full" 2>/dev/null | sed 's/^/      /' || true
+    fi
+    echo ""
+}
+
 # Unified step header (matches the Python AI-setup style)
 TOTAL_STEPS=10
 
@@ -853,21 +875,26 @@ manual_collect_remaining() {
 
   echo ""
   echo -e "${GREEN}${BOLD}  $L_step3${NC}"
-  echo -e "  ${DIM}$L_create_bot${NC} ${PURPLE}$L_botfather_url${NC} ${DIM}→ $L_botfather_cmd${NC}"
+  echo -e "  ${DIM}$L_create_bot${NC}"
+  show_url "$L_botfather_url" "$L_botfather_url"
+  echo -e "  ${DIM}    $L_botfather_cmd${NC}"
   echo ""
 
   while true; do
     read -p "  $L_tg_token" TG_TOKEN
     [ -n "$TG_TOKEN" ] && break
     echo -e "  ${RED}⚠ Telegram Bot Token — $L_required${NC}"
-    echo -e "  ${DIM}  Create one: t.me/BotFather → /newbot${NC}"
+    show_url "$L_botfather_url" "$L_botfather_url"
   done
+
+  echo -e "  ${DIM}$L_userid_get${NC}"
+  show_url "$L_userid_url" "$L_userid_url"
 
   while true; do
     read -p "  $L_tg_id" TG_USER_ID
     [ -n "$TG_USER_ID" ] && break
     echo -e "  ${RED}⚠ Telegram User ID — $L_required${NC}"
-    echo -e "  ${DIM}  Get it: t.me/userinfobot${NC}"
+    show_url "$L_userid_url" "$L_userid_url"
   done
 
   echo ""
