@@ -1408,6 +1408,18 @@ IDENTITYEOF
   cat > "$MAVKA_HOME/start.sh" << STARTEOF
 #!/bin/bash
 export HOME="$HOME"
+# Force UTF-8 locale: Pi's TUI uses box-drawing characters and emoji, and
+# the user often types Cyrillic. On terminals that inherit LANG=C / no
+# locale, all of this turns into mojibake (??? and âââ characters). Force
+# the most widely-available UTF-8 locale before launching Pi.
+export LANG="\${LANG:-en_US.UTF-8}"
+case "\$LANG" in
+  *.UTF-8|*.utf8|*.UTF8) ;;
+  *) export LANG="en_US.UTF-8" ;;
+esac
+export LC_ALL="\$LANG"
+export LC_CTYPE="\$LANG"
+
 # Hardcode the resolved node bin dir so this survives nvm version bumps.
 export PATH="${NODE_DIR}:\$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\$PATH"
 # Re-source nvm if present (covers manual node updates without breaking us)
