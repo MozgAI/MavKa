@@ -1610,14 +1610,16 @@ case "$ACTION" in
   chat|"")
     # Attach to running session if it's there, otherwise spawn fresh in
     # foreground so the user gets an interactive Pi prompt right here.
+    # tmux -u / screen -U force UTF-8 mode so Cyrillic + emoji render
+    # correctly on macOS where terminals can default to non-UTF-8.
     if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
       echo "🍃 Attaching to running MavKa (Ctrl+b d to detach)…"
-      tmux attach -t mavka
+      tmux -u attach -t mavka
     elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
       echo "🍃 Attaching to running MavKa (Ctrl+A → D to detach, NOT Ctrl+C)…"
-      # -x joins an already-attached session; if that fails (no other
-      # attacher), -D -RR forces a fresh re-attach.
-      screen -x mavka 2>/dev/null || screen -D -RR mavka
+      # -U forces UTF-8; -x joins an already-attached session; -D -RR
+      # forces a fresh re-attach if no clean -x is possible.
+      screen -U -x mavka 2>/dev/null || screen -U -D -RR mavka
     else
       echo "🍃 No running session — starting MavKa here. Type /exit to quit."
       bash "$MAVKA_HOME/start.sh"
@@ -2634,7 +2636,7 @@ setup_autostart() {
         <string>${HOME}/mavka-bot/launch.sh</string>
     </array>
     <key>RunAtLoad</key>
-    <true/>
+    <false/>
     <key>StandardOutPath</key>
     <string>${HOME}/mavka-bot/mavka.log</string>
     <key>StandardErrorPath</key>
@@ -2645,14 +2647,21 @@ setup_autostart() {
         <string>${HOME}</string>
         <key>PATH</key>
         <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${NODE_DIR}:${HOME}/.local/bin</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
+        <key>LC_ALL</key>
+        <string>en_US.UTF-8</string>
+        <key>LC_CTYPE</key>
+        <string>en_US.UTF-8</string>
     </dict>
 </dict>
 </plist>
 PLISTEOF
-    # Unload old version first so re-running the installer doesn't error under set -e
+    # Unload old version first so re-running the installer doesn't error under set -e.
+    # We do NOT load it now — that's deferred to start_with_verification() so we
+    # don't race against the explicit launch_bot call (Codex P1 fix).
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
-    launchctl load "$PLIST_PATH" 2>/dev/null || true
-    ok "LaunchAgent created (auto-start on login)"
+    ok "LaunchAgent plist written (deferred load until verified launch)"
 
   elif [ "$OS" = "linux" ]; then
     SERVICE_PATH="$HOME/.config/systemd/user/mavka.service"
@@ -2675,8 +2684,10 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin:${NODE_DIR}:${HOME}/.local/bin
 WantedBy=default.target
 SVCEOF
     systemctl --user daemon-reload 2>/dev/null || true
-    systemctl --user enable mavka 2>/dev/null || true
-    ok "Systemd service created (auto-start on login)"
+    # We do NOT `systemctl --user enable mavka` here — that's deferred to
+    # enable_autostart() after launch_bot verifies the unit actually works
+    # (Codex P1 fix).
+    ok "Systemd unit written (deferred enable until verified launch)"
   fi
 }
 
@@ -2818,29 +2829,45 @@ PYEOF
 launch_bot() {
   step "Launching ${BOT_NAME}..."
 
-  # If a LaunchAgent / systemd service is already going to start the bot
-  # via RunAtLoad, calling launch.sh here too can race — both launchers
-  # kill the screen and recreate it, /telegram-connect ends up firing
-  # into the wrong lifecycle. Wait briefly and only call launch.sh if no
-  # session is already alive from the autostart path.
-  for i in 1 2 3 4 5; do
-    if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
-       (screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'); then
-      ok "${BOT_NAME} is running (autostart already brought it up)."
-      return 0
-    fi
-    sleep 1
-  done
-
-  # No session up after 5s — explicit launch.
+  # The plist/service is written with RunAtLoad=false (Codex P1 fix), so
+  # there's no autostart racing us. We do the explicit launch here, verify
+  # the bridge, and only THEN enable_autostart() registers it for next boot.
   bash "$MAVKA_HOME/launch.sh"
   sleep 3
 
   if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
      (screen -ls >/dev/null 2>&1 && screen -ls 2>&1 | grep -q mavka); then
     ok "${BOT_NAME} is running!"
+    LAUNCH_OK=1
   else
     warn "${BOT_NAME} may need a moment to start. Check: tmux attach -t mavka"
+    LAUNCH_OK=0
+  fi
+}
+
+# ─── Auto-start enable (after verified launch) ────────────────
+# Codex P1 fix: only activate the LaunchAgent / systemd unit AFTER we've
+# confirmed launch_bot succeeded. If launch failed we leave autostart
+# inactive — the user re-runs the installer / fixes their config rather
+# than getting a daemon that flaps on every login.
+enable_autostart() {
+  if [ "${LAUNCH_OK:-0}" != "1" ]; then
+    warn "Skipping autostart enable — launch did not verify cleanly."
+    return 0
+  fi
+
+  step "Enabling auto-start on next login..."
+  if [ "$OS" = "mac" ]; then
+    PLIST_PATH="$HOME/Library/LaunchAgents/com.mavka.bot.plist"
+    if [ -f "$PLIST_PATH" ]; then
+      launchctl load "$PLIST_PATH" 2>/dev/null || \
+        warn "launchctl load failed — autostart may not work, but the bot is running now."
+      ok "LaunchAgent enabled (will auto-start on next login)"
+    fi
+  elif [ "$OS" = "linux" ]; then
+    systemctl --user enable mavka 2>/dev/null || \
+      warn "systemctl enable failed — autostart may not work, but the bot is running now."
+    ok "Systemd unit enabled (will auto-start on next login)"
   fi
 }
 
@@ -3018,11 +3045,11 @@ PYBOT
     echo ""
     sleep 1
     if [ "$ATTACH_BACKEND" = "tmux" ]; then
-      tmux attach -t mavka 2>/dev/null || true
+      tmux -u attach -t mavka 2>/dev/null || true
     else
-      # screen -x joins existing attached session; -D -RR forces re-attach
-      # if a previous terminal is hung. Either way we get into the bot.
-      screen -x mavka 2>/dev/null || screen -D -RR mavka 2>/dev/null || true
+      # -U forces UTF-8; -x joins an already-attached session; -D -RR
+      # forces re-attach if a previous terminal is hung.
+      screen -U -x mavka 2>/dev/null || screen -U -D -RR mavka 2>/dev/null || true
     fi
   else
     echo ""
@@ -3076,6 +3103,7 @@ main() {
   patch_telegram
   setup_autostart
   launch_bot
+  enable_autostart
   show_done
 }
 
