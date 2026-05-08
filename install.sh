@@ -1658,12 +1658,125 @@ case "$ACTION" in
     fi
     ;;
   doctor)
-    if [ -x "$MAVKA_HOME/lint.sh" ]; then
-      bash "$MAVKA_HOME/lint.sh"
+    # Health check — designed to catch every install-time root cause Codex's
+    # 2026-05-08 deep audit uncovered. Each row prints OK/WARN/FAIL + reason.
+    PASS=0; WARN=0; FAIL=0
+    g() { printf "  \033[32m✓\033[0m %s\n" "$1"; PASS=$((PASS+1)); }
+    y() { printf "  \033[33m!\033[0m %s\n" "$1"; WARN=$((WARN+1)); }
+    r() { printf "  \033[31m✗\033[0m %s\n" "$1"; FAIL=$((FAIL+1)); }
+    echo "🍃 MavKa doctor — full health check"
+    echo ""
+
+    # 1. pi binary
+    if command -v pi >/dev/null 2>&1; then
+      PI_VER=$(pi --version 2>/dev/null | head -1)
+      g "pi binary present (${PI_VER:-version unknown})"
     else
-      echo "doctor not yet installed; running status instead"
-      "$0" status
+      r "pi binary not in PATH — run installer again"
     fi
+
+    # 2. settings.json — telegram extension package wired up
+    SET="$HOME/.pi/agent/settings.json"
+    if [ -f "$SET" ]; then
+      if grep -q "pi-telegram" "$SET"; then
+        g "settings.json references pi-telegram"
+      else
+        r "settings.json exists but pi-telegram extension not registered"
+      fi
+    else
+      r "$SET missing — Pi never finished onboarding"
+    fi
+
+    # 3. pi-telegram source on disk + node_modules
+    PI_TG_DIR="$HOME/.pi/agent/git/github.com/badlogic/pi-telegram"
+    if [ -d "$PI_TG_DIR" ]; then
+      g "pi-telegram cloned at $PI_TG_DIR"
+      if [ -d "$PI_TG_DIR/node_modules" ]; then
+        g "pi-telegram node_modules present"
+      else
+        r "pi-telegram node_modules missing — run: cd $PI_TG_DIR && npm install"
+      fi
+      # 4. session_start has the startPolling patch (Codex P0.1)
+      INDEX="$PI_TG_DIR/index.ts"
+      if [ -f "$INDEX" ]; then
+        if grep -q "startPolling" "$INDEX"; then
+          g "pi-telegram session_start has startPolling (patch applied)"
+        else
+          r "pi-telegram session_start NOT patched — telegram bridge will silently no-op"
+        fi
+      else
+        r "pi-telegram index.ts missing — upstream layout changed?"
+      fi
+    else
+      r "pi-telegram not cloned — installer's first_run did not finish"
+    fi
+
+    # 5. telegram.json (token + user id)
+    TG_JSON="$HOME/.pi/agent/telegram.json"
+    if [ -f "$TG_JSON" ]; then
+      if grep -q "botToken" "$TG_JSON" && grep -q "allowedUserIds" "$TG_JSON"; then
+        g "telegram.json has botToken + allowedUserIds"
+      else
+        r "telegram.json malformed — re-run installer"
+      fi
+    else
+      r "$TG_JSON missing — telegram never configured"
+    fi
+
+    # 6. tmux/screen backend
+    if command -v tmux >/dev/null 2>&1; then
+      g "tmux available (preferred backend)"
+    elif command -v screen >/dev/null 2>&1; then
+      y "tmux not installed; falling back to screen"
+    else
+      r "neither tmux nor screen installed — bot can't run detached"
+    fi
+
+    # 7. locale (Codex P1, prevents Cyrillic mojibake)
+    LOC="${LANG}${LC_ALL}${LC_CTYPE}"
+    if echo "$LOC" | grep -qi "utf"; then
+      g "locale is UTF-8 (LANG=$LANG)"
+    else
+      y "locale not UTF-8 (LANG=$LANG) — bot's start.sh forces it, but your shell may show mojibake"
+    fi
+
+    # 8. session running
+    if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
+       (screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'); then
+      g "MavKa session is running"
+    else
+      y "no running MavKa session (try: mavka start)"
+    fi
+
+    # 9. /telegram-status polling check (only if pi+session are healthy)
+    if command -v pi >/dev/null 2>&1 && (tmux list-sessions 2>/dev/null | grep -q mavka); then
+      tmux send-keys -t mavka "/telegram-status" Enter 2>/dev/null && sleep 2
+      OUT=$(tmux capture-pane -pt mavka -S -50 2>/dev/null)
+      if echo "$OUT" | grep -qE "polling|connected|running"; then
+        g "telegram bridge reports active (/telegram-status: polling/connected)"
+      elif [ -n "$OUT" ]; then
+        y "/telegram-status did not show 'polling' — bridge may not be live yet"
+      fi
+    fi
+
+    # 10. LaunchAgent / systemd unit
+    if [ -f "$HOME/Library/LaunchAgents/com.mavka.bot.plist" ]; then
+      if launchctl list 2>/dev/null | grep -q com.mavka.bot; then
+        g "LaunchAgent loaded (autostart enabled)"
+      else
+        y "LaunchAgent plist exists but not loaded — autostart off until next install verifies launch"
+      fi
+    elif [ -f "$HOME/.config/systemd/user/mavka.service" ]; then
+      if systemctl --user is-enabled mavka 2>/dev/null | grep -q enabled; then
+        g "systemd unit enabled (autostart on)"
+      else
+        y "systemd unit exists but not enabled — autostart off"
+      fi
+    fi
+
+    echo ""
+    echo "Result: $PASS ok, $WARN warn, $FAIL fail"
+    [ "$FAIL" -gt 0 ] && exit 1 || exit 0
     ;;
   uninstall)
     "$0" stop
@@ -1686,6 +1799,7 @@ MavKa 🍃 — control commands
   mavka restart      stop + start
   mavka logs         tail mavka.log
   mavka status       running / stopped
+  mavka doctor       full health check (pi, telegram, locale, autostart)
   mavka uninstall    remove autostart (files stay)
   mavka help         this message
 USAGE
