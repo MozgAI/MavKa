@@ -1432,6 +1432,10 @@ STARTEOF
   ok "Start script created"
 
   # ── launch.sh (tmux/screen/nohup wrapper — Pi Agent needs TTY) ──
+  # After spawning the session we explicitly type /telegram-connect into Pi
+  # so the bridge wakes up. Without this, Pi sits idle until the first user
+  # message hits the bot — and if pi-telegram isn't activated, that message
+  # goes nowhere and the user gives up. Same trick Epstein's launcher uses.
   cat > "$MAVKA_HOME/launch.sh" << 'LAUNCHEOF'
 #!/bin/bash
 LOGFILE="$HOME/mavka-bot/mavka.log"
@@ -1443,6 +1447,10 @@ if command -v tmux &>/dev/null; then
   sleep 1
   tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" >/dev/null 2>>"$LOGFILE" || true
   echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
+  # Wait for Pi to be ready, then fire /telegram-connect to wake the bridge.
+  sleep 8
+  tmux send-keys -t mavka "/telegram-connect" Enter 2>>"$LOGFILE" || true
+  echo "$(date): /telegram-connect sent (tmux)" >> "$LOGFILE"
 elif command -v screen &>/dev/null; then
   # macOS screen prints "No screen session found" to STDOUT (not stderr) when
   # there's nothing to kill — redirect both streams.
@@ -1450,12 +1458,17 @@ elif command -v screen &>/dev/null; then
   sleep 1
   screen -dmS mavka bash "$HOME/mavka-bot/start.sh" >/dev/null 2>&1 || true
   echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
+  # Wait for Pi to be ready, then fire /telegram-connect to wake the bridge.
+  sleep 8
+  screen -S mavka -p 0 -X stuff "/telegram-connect"$'\n' 2>>"$LOGFILE" || true
+  echo "$(date): /telegram-connect sent (screen)" >> "$LOGFILE"
 else
   # Final fallback: nohup. No interactive attach available, but the bot runs.
   pkill -f "mavka-bot/start.sh" 2>/dev/null || true
   sleep 1
   nohup bash "$HOME/mavka-bot/start.sh" >>"$LOGFILE" 2>&1 &
   echo "$(date): MavKa launched via nohup (PID $!)" >> "$LOGFILE"
+  echo "$(date): WARN: nohup mode, no terminal to fire /telegram-connect — bridge may not wake" >> "$LOGFILE"
 fi
 LAUNCHEOF
   chmod +x "$MAVKA_HOME/launch.sh"
