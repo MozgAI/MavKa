@@ -1474,6 +1474,121 @@ LAUNCHEOF
   chmod +x "$MAVKA_HOME/launch.sh"
   ok "Launcher created"
 
+  # ── mavka cli (single-word entry point) ──
+  # `mavka` (no args) — interactive chat with the bot in this terminal
+  # (attaches to the running screen session if alive, falls back to fresh
+  # foreground Pi). All other subcommands map to existing scripts.
+  cat > "$MAVKA_HOME/mavka" << 'MAVKAEOF'
+#!/bin/bash
+# MavKa 🍃 — single-word CLI. Run `mavka` to talk to the bot in this
+# terminal, `mavka logs` to tail logs, etc.
+
+MAVKA_HOME="$HOME/mavka-bot"
+ACTION="${1:-chat}"
+
+case "$ACTION" in
+  chat|"")
+    # Attach to running session if it's there, otherwise spawn fresh in
+    # foreground so the user gets an interactive Pi prompt right here.
+    if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
+      echo "🍃 Attaching to running MavKa (Ctrl+b d to detach)…"
+      tmux attach -t mavka
+    elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
+      echo "🍃 Attaching to running MavKa (Ctrl+a d to detach)…"
+      screen -r mavka
+    else
+      echo "🍃 No running session — starting MavKa here. Type /exit to quit."
+      bash "$MAVKA_HOME/start.sh"
+    fi
+    ;;
+  start)
+    bash "$MAVKA_HOME/launch.sh"
+    echo "MavKa started. `mavka logs` to follow."
+    ;;
+  stop)
+    if [ -f "$HOME/Library/LaunchAgents/com.mavka.bot.plist" ]; then
+      launchctl unload "$HOME/Library/LaunchAgents/com.mavka.bot.plist" 2>/dev/null
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl --user stop mavka 2>/dev/null
+    fi
+    tmux kill-session -t mavka 2>/dev/null
+    screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1
+    pkill -f "mavka-bot/start.sh" 2>/dev/null
+    echo "MavKa stopped."
+    ;;
+  restart)
+    "$0" stop
+    sleep 2
+    "$0" start
+    ;;
+  logs)
+    tail -f "$MAVKA_HOME/mavka.log"
+    ;;
+  status)
+    if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
+       (screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'); then
+      echo "running"
+    else
+      echo "stopped"
+    fi
+    ;;
+  doctor)
+    if [ -x "$MAVKA_HOME/lint.sh" ]; then
+      bash "$MAVKA_HOME/lint.sh"
+    else
+      echo "doctor not yet installed; running status instead"
+      "$0" status
+    fi
+    ;;
+  uninstall)
+    "$0" stop
+    if [ -f "$HOME/Library/LaunchAgents/com.mavka.bot.plist" ]; then
+      rm -f "$HOME/Library/LaunchAgents/com.mavka.bot.plist"
+    fi
+    if [ -f "$HOME/.config/systemd/user/mavka.service" ]; then
+      systemctl --user disable mavka 2>/dev/null
+      rm -f "$HOME/.config/systemd/user/mavka.service"
+    fi
+    echo "MavKa uninstalled. Files in $MAVKA_HOME remain — remove manually if desired."
+    ;;
+  -h|--help|help)
+    cat <<USAGE
+MavKa 🍃 — control commands
+
+  mavka              chat with the bot in this terminal
+  mavka start        start the bot (foreground/screen autostart)
+  mavka stop         stop the bot
+  mavka restart      stop + start
+  mavka logs         tail mavka.log
+  mavka status       running / stopped
+  mavka uninstall    remove autostart (files stay)
+  mavka help         this message
+USAGE
+    ;;
+  *)
+    echo "Unknown action: $ACTION (try \`mavka help\`)"
+    exit 1
+    ;;
+esac
+MAVKAEOF
+  chmod +x "$MAVKA_HOME/mavka"
+  ok "mavka CLI created"
+
+  # Try to wire `mavka` into PATH so the user can type it from anywhere.
+  # Prefer a symlink in /usr/local/bin (no PATH edits, no shell-rc edits)
+  # if the dir is writable; fall back to a hint.
+  if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
+    ln -sf "$MAVKA_HOME/mavka" /usr/local/bin/mavka 2>/dev/null && \
+      ok "linked /usr/local/bin/mavka → ~/mavka-bot/mavka"
+  elif [ -d "$HOME/.local/bin" ]; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$MAVKA_HOME/mavka" "$HOME/.local/bin/mavka" 2>/dev/null && \
+      ok "linked ~/.local/bin/mavka → ~/mavka-bot/mavka (make sure ~/.local/bin is in PATH)"
+  else
+    info "Add this to your shell rc to run \`mavka\` from anywhere: export PATH=\"\$HOME/mavka-bot:\$PATH\""
+  fi
+
   # ── search.sh ──
   cat > "$MAVKA_HOME/search.sh" << 'SEARCHEOF'
 #!/bin/bash
