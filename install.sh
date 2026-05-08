@@ -2761,7 +2761,7 @@ else:
 \t\t}
 \t\tif ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {
 \t\t\t(ctx as any).ui.setWorkingIndicator({
-\t\t\t\tframes: ['🍃     ', ' 🍃    ', '  🍃   ', '   🍃  ', '    🍃 ', '     🍃', '    🍃 ', '   🍃  ', '  🍃   ', ' 🍃    '],
+\t\t\t\tframes: ['🍃', '🌳', '🍃', '🌲', '🍃', '🌿', '🍃', '🍀', '🍃'],
 \t\t\t\tintervalMs: 180,
 \t\t\t});
 \t\t}
@@ -2809,7 +2809,7 @@ if "setWorkingIndicator" not in content:
         spinner_block = (
             f"\n{indent2}if ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {{\n"
             f"{indent2}\t(ctx as any).ui.setWorkingIndicator({{\n"
-            f"{indent2}\t\tframes: ['🍃     ', ' 🍃    ', '  🍃   ', '   🍃  ', '    🍃 ', '     🍃', '    🍃 ', '   🍃  ', '  🍃   ', ' 🍃    '],\n"
+            f"{indent2}\t\tframes: ['🍃', '🌳', '🍃', '🌲', '🍃', '🌿', '🍃', '🍀', '🍃'],\n"
             f"{indent2}\t\tintervalMs: 180,\n"
             f"{indent2}\t}});\n"
             f"{indent2}}}"
