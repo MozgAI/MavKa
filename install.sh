@@ -2582,7 +2582,7 @@ PYEOF
 # files and restrict network for the `bash` tool.
 # https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/sandbox
 setup_sandbox() {
-  step "Setting up Pi sandbox extension..."
+  step "Setting up sandbox..."
 
   SANDBOX_DIR="$HOME/.pi/agent/extensions/sandbox"
   mkdir -p "$SANDBOX_DIR"
@@ -2665,7 +2665,7 @@ SANDBOXJSON
     ok "Sandbox extension configured (deny-list applied)"
     SANDBOX_ENABLED=1
   else
-    warn "Sandbox unavailable on this system — Pi will run with full file/network access"
+    warn "Sandbox unavailable on this system — MavKa will run with full file/network access"
     SANDBOX_ENABLED=0
   fi
 }
@@ -2832,7 +2832,42 @@ if "setWorkingIndicator" not in content:
 else:
     print("✓ MavKa spinner already installed — no patch needed")
 
-# 5. Check if markdownToTelegramHtml exists
+# 5. Phantom "…" message cleanup. Pi-telegram's clearPreview() only
+# clears DRAFT mode, but if the bot sent a real partial message and
+# then aborted / errored / had its turn pre-empted, the partial sits
+# in the Telegram chat forever as a stuck "…" message. We append a
+# message-mode delete to clearPreview's body so it actually cleans up.
+# Idempotent: keyed on a unique marker comment we inject.
+phantom_marker = "MAVKA_PATCH_PHANTOM_CLEANUP"
+if phantom_marker not in content:
+    fn_re = re.compile(
+        r'(async function clearPreview\([^)]*\):\s*Promise<void>\s*\{)([\s\S]*?)(\n\t\})',
+        re.MULTILINE,
+    )
+    fm = fn_re.search(content)
+    if fm:
+        head_fn, body_fn, tail_fn = fm.group(1), fm.group(2), fm.group(3)
+        cleanup = (
+            f"\n\t\t// {phantom_marker}: also delete a sent placeholder so it\n"
+            f"\t\t// doesn't sit in the chat as a phantom \"…\" forever.\n"
+            f"\t\tif (state.mode === \"message\" && (state as any).messageId !== undefined) {{\n"
+            f"\t\t\ttry {{\n"
+            f"\t\t\t\tawait callTelegram(\"deleteMessage\", {{ chat_id: chatId, message_id: (state as any).messageId }});\n"
+            f"\t\t\t}} catch {{\n"
+            f"\t\t\t\t// ignore — message may already be gone\n"
+            f"\t\t\t}}\n"
+            f"\t\t}}"
+        )
+        new_body_fn = body_fn.rstrip() + cleanup
+        content = content.replace(fm.group(0), head_fn + new_body_fn + tail_fn, 1)
+        changes += 1
+        print("✓ Added phantom-message cleanup to clearPreview")
+    else:
+        print("⚠ clearPreview not found — skipping phantom-message fix")
+else:
+    print("✓ Phantom-message cleanup already present — no patch needed")
+
+# 6. Check if markdownToTelegramHtml exists
 if "markdownToTelegramHtml" not in content:
     print("⚠ markdownToTelegramHtml not found — this version may need manual patching")
 else:
@@ -2959,7 +2994,7 @@ first_run() {
   # Pi's expected git path, then npm install if a package.json is present.
   # patch_telegram() runs on stable code afterwards and the FIRST real Pi
   # launch is the one in launch_bot.
-  step "Pre-installing Pi extensions (pi-telegram, pi-skills)..."
+  step "Pre-installing MavKa extensions..."
 
   PI_GIT="$HOME/.pi/agent/git/github.com/badlogic"
   mkdir -p "$PI_GIT"
