@@ -969,17 +969,21 @@ install_deps() {
     ok "Python3 found"
   fi
 
-  # tmux or screen (Pi Agent needs TTY)
+  # tmux (preferred) — Pi Agent needs a real terminal multiplexer to detach,
+  # and our /telegram-status verification depends on tmux capture-pane. On
+  # macOS we install tmux even if screen is present, because the bundled
+  # screen (4.00.03 from 2006) mangles UTF-8 and our screen -X hardcopy
+  # capture is unreliable with it. screen stays as a last-resort fallback
+  # only when tmux can't be installed.
   if command -v tmux &>/dev/null; then
     ok "tmux found"
-  elif command -v screen &>/dev/null; then
-    ok "screen found"
   else
     if [ "$OS" = "linux" ]; then
       info "Installing tmux..."
       sudo apt-get install -y tmux 2>/dev/null || sudo yum install -y tmux 2>/dev/null || \
       sudo pacman -S --noconfirm tmux 2>/dev/null || true
     elif [ "$OS" = "mac" ]; then
+      info "Installing tmux (required on macOS — bundled 'screen' is too old)..."
       # On a fresh Mac brew may not be installed yet — install it non-interactively
       if ! command -v brew &>/dev/null; then
         info "Installing Homebrew (one-time, ~1 minute)..."
@@ -996,7 +1000,7 @@ install_deps() {
     if command -v tmux &>/dev/null; then
       ok "tmux installed"
     elif command -v screen &>/dev/null; then
-      ok "screen found (fallback)"
+      warn "Could not install tmux — falling back to screen (less reliable)"
     else
       warn "Neither tmux nor screen found — bot will run via nohup fallback."
     fi
