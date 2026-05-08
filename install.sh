@@ -2796,10 +2796,11 @@ else:
 # 4. MavKa breath spinner — replace pi's default braille spinner
 # (⠋⠙⠹...) with a 4-state circle pulsing on a breath-like rhythm:
 # rest (◌) → inhale (◍) → peak (◎) → exhale (◍) → back to rest.
-# Asymmetric phase counts at 200 ms/frame give a 3.4 s cycle that
-# reads as breath (not a metronome). ANSI escape colours every frame
-# in MavKa's brand green (256-colour 71). Idempotent — only injects
-# if "setWorkingIndicator" is not already present.
+# 11 frames × 180 ms = ~2.0 s per breath — alert/aware pace, not
+# meditative. Asymmetric phase counts (rest 3, inhale 2, peak 3,
+# exhale 3) give it a living feel instead of a metronome. ANSI
+# escape colours every frame in MavKa's brand green (256-colour 71).
+# Idempotent — only injects if "setWorkingIndicator" not present.
 if "setWorkingIndicator" not in content:
     m2 = session_start_re.search(content)
     if m2:
@@ -2808,21 +2809,17 @@ if "setWorkingIndicator" not in content:
         m_indent2 = re.search(r'\n([ \t]+)\S', body2)
         if m_indent2:
             indent2 = m_indent2.group(1)
-        # Build frame list inline so it's readable in the patched output.
-        # G + symbol + RESET — green wraps each frame so colour stays
-        # exactly while the symbol cycles. Pi's loader renders frames
-        # verbatim (no theme colour override) when an indicator is set.
         spinner_block = (
             f"\n{indent2}if ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {{\n"
             f"{indent2}\tconst G = '\\u001b[38;5;71m', N = '\\u001b[0m';\n"
             f"{indent2}\t(ctx as any).ui.setWorkingIndicator({{\n"
             f"{indent2}\t\tframes: [\n"
-            f"{indent2}\t\t\tG+'◌'+N, G+'◌'+N, G+'◌'+N, G+'◌'+N, G+'◌'+N,  // rest 1.0s\n"
-            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N, G+'◍'+N,                  // inhale 0.6s\n"
-            f"{indent2}\t\t\tG+'◎'+N, G+'◎'+N, G+'◎'+N, G+'◎'+N, G+'◎'+N,  // peak 1.0s\n"
-            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N, G+'◍'+N, G+'◍'+N,            // exhale 0.8s\n"
+            f"{indent2}\t\t\tG+'◌'+N, G+'◌'+N, G+'◌'+N,         // rest 0.54s\n"
+            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N,                  // inhale 0.36s\n"
+            f"{indent2}\t\t\tG+'◎'+N, G+'◎'+N, G+'◎'+N,         // peak 0.54s\n"
+            f"{indent2}\t\t\tG+'◍'+N, G+'◍'+N, G+'◍'+N,         // exhale 0.54s\n"
             f"{indent2}\t\t],\n"
-            f"{indent2}\t\tintervalMs: 200,\n"
+            f"{indent2}\t\tintervalMs: 180,\n"
             f"{indent2}\t}});\n"
             f"{indent2}}}"
         )
