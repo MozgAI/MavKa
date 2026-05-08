@@ -2469,13 +2469,53 @@ if old_bold in content:
     changes += 1
     print("✓ Fixed bold regex")
 
-# 2. Auto-connect on session_start (if not already patched)
-if 'pi.on("session_start"' not in content:
-    # Find the session_end handler and add session_start before it
-    session_end_pattern = r'pi\.on\("session_end"'
-    match = re.search(session_end_pattern, content)
-    if match:
-        insert_pos = match.start()
+# 2. Auto-connect on session_start.
+#
+# Upstream pi-telegram already has a session_start handler. The old patch
+# only acted when it was *absent*, which silently no-op'd on current
+# upstream → no auto-connect → bridge stayed dependent on a fragile typed
+# /telegram-connect that may fire before Pi is ready.
+#
+# New behaviour:
+#  - if a session_start handler exists AND already calls startPolling → done
+#  - if session_start exists but does NOT call startPolling → inject the
+#    `if (config.botToken) { await startPolling(ctx); ... }` block at the
+#    end of the handler body
+#  - if session_start does NOT exist → insert a fresh handler before
+#    session_end (legacy path)
+#  - if neither pattern is present → fail loudly so we don't silently ship
+#    a broken bridge
+session_start_re = re.compile(
+    r'(pi\.on\("session_start",\s*async\s*\([^)]*\)\s*=>\s*\{)([\s\S]*?)(\n\s*\}\);)',
+    re.MULTILINE,
+)
+m = session_start_re.search(content)
+if m:
+    head, body, tail = m.group(1), m.group(2), m.group(3)
+    if "startPolling" in body:
+        print("✓ session_start already calls startPolling — no patch needed")
+    else:
+        # Inject the auto-connect block at the end of the handler body.
+        # Match the indentation of the handler's existing body lines.
+        indent = "\t\t"
+        m_indent = re.search(r'\n([ \t]+)\S', body)
+        if m_indent:
+            indent = m_indent.group(1)
+        injection = (
+            f"\n{indent}if (config && config.botToken) {{\n"
+            f"{indent}\tawait startPolling(ctx);\n"
+            f"{indent}\tupdateStatus(ctx);\n"
+            f"{indent}}}"
+        )
+        new_body = body.rstrip() + injection
+        content = content.replace(m.group(0), head + new_body + tail, 1)
+        changes += 1
+        print("✓ Injected startPolling into existing session_start handler")
+else:
+    # Legacy fallback: insert a fresh session_start before session_end.
+    session_end_match = re.search(r'pi\.on\("session_end"', content)
+    if session_end_match:
+        insert_pos = session_end_match.start()
         auto_connect = '''pi.on("session_start", async (_event, ctx) => {
 \t\tconfig = await readConfig();
 \t\tawait mkdir(TEMP_DIR, { recursive: true });
@@ -2489,9 +2529,10 @@ if 'pi.on("session_start"' not in content:
 \t'''
         content = content[:insert_pos] + auto_connect + content[insert_pos:]
         changes += 1
-        print("✓ Added auto-connect on session_start")
+        print("✓ Added fresh session_start handler with auto-connect")
     else:
-        print("⚠ Could not find session_end handler for auto-connect patch")
+        print("⚠ FAIL: neither session_start nor session_end found in pi-telegram — upstream API changed; manual patch required")
+        sys.exit(2)
 
 # 3. Check if markdownToTelegramHtml exists
 if "markdownToTelegramHtml" not in content:
