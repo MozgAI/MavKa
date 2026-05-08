@@ -2759,6 +2759,12 @@ else:
 \t\t\tawait startPolling(ctx);
 \t\t\tupdateStatus(ctx);
 \t\t}
+\t\tif ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {
+\t\t\t(ctx as any).ui.setWorkingIndicator({
+\t\t\t\tframes: ['🍃     ', ' 🍃    ', '  🍃   ', '   🍃  ', '    🍃 ', '     🍃', '    🍃 ', '   🍃  ', '  🍃   ', ' 🍃    '],
+\t\t\t\tintervalMs: 180,
+\t\t\t});
+\t\t}
 \t});
 
 \t'''
@@ -2769,7 +2775,55 @@ else:
         print("⚠ FAIL: neither session_start nor session_end found in pi-telegram — upstream API changed; manual patch required")
         sys.exit(2)
 
-# 3. Check if markdownToTelegramHtml exists
+# 3. Drop the visible "[telegram]" prefix on every incoming Telegram
+# message — Olesya called it "stupid because it's obvious". We replace
+# the constant with a zero-width space (U+200B): invisible to the user,
+# still present for the isTelegramPrompt() routing check that decides
+# whether to add the "this message came from Telegram" suffix to the
+# system prompt. Idempotent: only changes the line that's still the
+# original "[telegram]" form.
+old_prefix = 'const TELEGRAM_PREFIX = "[telegram]";'
+new_prefix = 'const TELEGRAM_PREFIX = "\\u200B";'
+if old_prefix in content:
+    content = content.replace(old_prefix, new_prefix, 1)
+    changes += 1
+    print("✓ Hid the [telegram] prefix (now zero-width)")
+elif new_prefix in content:
+    print("✓ [telegram] prefix already hidden — no patch needed")
+else:
+    print("⚠ TELEGRAM_PREFIX line not in expected form — skipping prefix hide")
+
+# 4. MavKa 🍃 brand spinner — replace pi's default braille spinner
+# (⠋⠙⠹...) with leaf bouncing left-right. Runs INDEPENDENTLY of
+# the startPolling injection above so it works even when session_start
+# already calls startPolling on its own. Idempotent — only injects
+# if "setWorkingIndicator" is not already present.
+if "setWorkingIndicator" not in content:
+    m2 = session_start_re.search(content)
+    if m2:
+        head2, body2, tail2 = m2.group(1), m2.group(2), m2.group(3)
+        indent2 = "\t\t"
+        m_indent2 = re.search(r'\n([ \t]+)\S', body2)
+        if m_indent2:
+            indent2 = m_indent2.group(1)
+        spinner_block = (
+            f"\n{indent2}if ((ctx as any).ui && typeof (ctx as any).ui.setWorkingIndicator === 'function') {{\n"
+            f"{indent2}\t(ctx as any).ui.setWorkingIndicator({{\n"
+            f"{indent2}\t\tframes: ['🍃     ', ' 🍃    ', '  🍃   ', '   🍃  ', '    🍃 ', '     🍃', '    🍃 ', '   🍃  ', '  🍃   ', ' 🍃    '],\n"
+            f"{indent2}\t\tintervalMs: 180,\n"
+            f"{indent2}\t}});\n"
+            f"{indent2}}}"
+        )
+        new_body2 = body2.rstrip() + spinner_block
+        content = content.replace(m2.group(0), head2 + new_body2 + tail2, 1)
+        changes += 1
+        print("✓ Injected MavKa leaf spinner into session_start")
+    else:
+        print("⚠ session_start not found — skipping spinner branding")
+else:
+    print("✓ MavKa spinner already installed — no patch needed")
+
+# 5. Check if markdownToTelegramHtml exists
 if "markdownToTelegramHtml" not in content:
     print("⚠ markdownToTelegramHtml not found — this version may need manual patching")
 else:
