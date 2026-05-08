@@ -2726,19 +2726,55 @@ PYBOT
   # before being dropped back to a shell prompt where they might start typing.
   echo ""
   case "$BOT_LANG" in
-    ru) PRESS_ENTER="Нажми Enter чтобы закрыть установщик и перейти в Telegram..." ;;
-    uk) PRESS_ENTER="Натисни Enter, щоб закрити установник і перейти в Telegram..." ;;
-    de) PRESS_ENTER="Drücke Enter, um das Installationsprogramm zu schließen und zu Telegram zu wechseln..." ;;
-    fr) PRESS_ENTER="Appuie sur Entrée pour fermer l'installateur et ouvrir Telegram..." ;;
-    es) PRESS_ENTER="Pulsa Enter para cerrar el instalador y abrir Telegram..." ;;
-    *)  PRESS_ENTER="Press Enter to close the installer and open Telegram..." ;;
+    ru) PRESS_ENTER="Нажми Enter чтобы открыть чат с MavKa в этом терминале..." ;;
+    uk) PRESS_ENTER="Натисни Enter, щоб відкрити чат з MavKa у цьому терміналі..." ;;
+    de) PRESS_ENTER="Drücke Enter, um den MavKa-Chat in diesem Terminal zu öffnen..." ;;
+    fr) PRESS_ENTER="Appuie sur Entrée pour ouvrir le chat MavKa dans ce terminal..." ;;
+    es) PRESS_ENTER="Pulsa Enter para abrir el chat con MavKa en este terminal..." ;;
+    *)  PRESS_ENTER="Press Enter to open the MavKa chat in this terminal..." ;;
   esac
   read -p "  $PRESS_ENTER " _ </dev/tty 2>/dev/null || sleep 5
 
-  # On macOS, try to actually open the bot in Telegram for the user.
+  # On macOS, try to also open the bot in Telegram for the user (parallel
+  # surface — chat with the bot in either place).
   if [ "$OS" = "mac" ] && [ -n "$BOT_LINK" ]; then
     open "$BOT_LINK" 2>/dev/null || true
   fi
+
+  # Hand the user over to the live MavKa session in this terminal. The bot
+  # is already running in screen/tmux from launch_bot. Attach so the user
+  # can talk to it right here and confirm everything works. Detach with
+  # Ctrl+a then d (screen) or Ctrl+b then d (tmux) — bot keeps running.
+  echo ""
+  case "$BOT_LANG" in
+    ru) ATTACH_HINT="Ctrl+A затем D чтобы выйти из чата (бот останется работать)" ;;
+    uk) ATTACH_HINT="Ctrl+A потім D щоб вийти з чату (бот продовжить працювати)" ;;
+    de) ATTACH_HINT="Ctrl+A dann D zum Verlassen (der Bot läuft weiter)" ;;
+    fr) ATTACH_HINT="Ctrl+A puis D pour quitter (le bot continue de tourner)" ;;
+    es) ATTACH_HINT="Ctrl+A luego D para salir (el bot sigue corriendo)" ;;
+    *)  ATTACH_HINT="Ctrl+A then D to detach (bot keeps running)" ;;
+  esac
+  echo -e "  ${DIM}${ATTACH_HINT}${NC}"
+  echo ""
+  sleep 1
+  if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
+    tmux attach -t mavka 2>/dev/null || true
+  elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
+    screen -r mavka 2>/dev/null || true
+  fi
+
+  # After detach: short, warm goodbye so the user knows they're back in shell.
+  echo ""
+  case "$BOT_LANG" in
+    ru) BYE="MavKa продолжает работать в фоне. Запусти 'mavka' чтобы вернуться в чат." ;;
+    uk) BYE="MavKa продовжує працювати у фоні. Запусти 'mavka' щоб повернутися в чат." ;;
+    de) BYE="MavKa läuft im Hintergrund weiter. Tippe 'mavka' um zurückzukehren." ;;
+    fr) BYE="MavKa continue de tourner en arrière-plan. Tape 'mavka' pour revenir." ;;
+    es) BYE="MavKa sigue corriendo en segundo plano. Escribe 'mavka' para volver." ;;
+    *)  BYE="MavKa keeps running in the background. Type 'mavka' anytime to return." ;;
+  esac
+  echo -e "  ${GREEN}🍃 ${BYE}${NC}"
+  echo ""
 }
 
 # ─── Main ─────────────────────────────────────────────────────
