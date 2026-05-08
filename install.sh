@@ -1459,36 +1459,78 @@ STARTEOF
   ok "Start script created"
 
   # ── launch.sh (tmux/screen/nohup wrapper — Pi Agent needs TTY) ──
-  # After spawning the session we explicitly type /telegram-connect into Pi
-  # so the bridge wakes up. Without this, Pi sits idle until the first user
-  # message hits the bot — and if pi-telegram isn't activated, that message
-  # goes nowhere and the user gives up. Same trick Epstein's launcher uses.
+  # After spawning the session we wait for it to actually exist, then
+  # explicitly type /telegram-connect into Pi so the bridge wakes up.
+  # Both creation and the connect call are *verified* — failures are
+  # logged as ERROR so the user can see exactly what broke instead of a
+  # silent "looks fine but Telegram is dead" outcome.
+  # Also uses flock around the spawn to avoid races between this manual
+  # call and a parallel autostart (LaunchAgent/systemd RunAtLoad).
   cat > "$MAVKA_HOME/launch.sh" << 'LAUNCHEOF'
 #!/bin/bash
 LOGFILE="$HOME/mavka-bot/mavka.log"
+LOCKFILE="$HOME/mavka-bot/.launch.lock"
 echo "$(date): Starting MavKa..." >> "$LOGFILE"
+
+# Serialise launches: prevent autostart + manual launch from racing each
+# other and killing one another's session mid-spawn.
+exec 9>"$LOCKFILE"
+if command -v flock >/dev/null 2>&1; then
+  flock -w 30 9 || { echo "$(date): WARN: could not acquire launch lock, proceeding" >> "$LOGFILE"; }
+fi
+
+session_alive() {
+  if command -v tmux &>/dev/null && tmux has-session -t mavka 2>/dev/null; then
+    return 0
+  fi
+  if command -v screen &>/dev/null && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
+    return 0
+  fi
+  return 1
+}
 
 # All output kept in $LOGFILE — nothing technical printed to user's terminal.
 if command -v tmux &>/dev/null; then
   tmux kill-session -t mavka >/dev/null 2>&1 || true
   sleep 1
-  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" >/dev/null 2>>"$LOGFILE" || true
-  echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
-  # Wait for Pi to be ready, then fire /telegram-connect to wake the bridge.
-  sleep 8
-  tmux send-keys -t mavka "/telegram-connect" Enter 2>>"$LOGFILE" || true
-  echo "$(date): /telegram-connect sent (tmux)" >> "$LOGFILE"
+  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
+  # Wait up to 8s for the session to actually exist before sending keys.
+  for i in 1 2 3 4 5 6 7 8; do
+    tmux has-session -t mavka 2>/dev/null && break
+    sleep 1
+  done
+  if tmux has-session -t mavka 2>/dev/null; then
+    echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
+    sleep 5  # let pi finish bootstrap
+    if tmux send-keys -t mavka "/telegram-connect" Enter 2>>"$LOGFILE"; then
+      echo "$(date): /telegram-connect sent (tmux)" >> "$LOGFILE"
+    else
+      echo "$(date): ERROR: /telegram-connect send failed (tmux)" >> "$LOGFILE"
+    fi
+  else
+    echo "$(date): ERROR: tmux session did not start" >> "$LOGFILE"
+  fi
 elif command -v screen &>/dev/null; then
   # macOS screen prints "No screen session found" to STDOUT (not stderr) when
   # there's nothing to kill — redirect both streams.
   { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   sleep 1
-  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" >/dev/null 2>&1 || true
-  echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
-  # Wait for Pi to be ready, then fire /telegram-connect to wake the bridge.
-  sleep 8
-  screen -S mavka -p 0 -X stuff "/telegram-connect"$'\n' 2>>"$LOGFILE" || true
-  echo "$(date): /telegram-connect sent (screen)" >> "$LOGFILE"
+  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
+  for i in 1 2 3 4 5 6 7 8; do
+    screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]' && break
+    sleep 1
+  done
+  if screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
+    echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
+    sleep 5  # let pi finish bootstrap
+    if screen -S mavka -p 0 -X stuff "/telegram-connect"$'\n' 2>>"$LOGFILE"; then
+      echo "$(date): /telegram-connect sent (screen)" >> "$LOGFILE"
+    else
+      echo "$(date): ERROR: /telegram-connect stuff failed (screen)" >> "$LOGFILE"
+    fi
+  else
+    echo "$(date): ERROR: screen session did not start" >> "$LOGFILE"
+  fi
 else
   # Final fallback: nohup. No interactive attach available, but the bot runs.
   pkill -f "mavka-bot/start.sh" 2>/dev/null || true
@@ -1521,8 +1563,10 @@ case "$ACTION" in
       echo "🍃 Attaching to running MavKa (Ctrl+b d to detach)…"
       tmux attach -t mavka
     elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
-      echo "🍃 Attaching to running MavKa (Ctrl+a d to detach)…"
-      screen -r mavka
+      echo "🍃 Attaching to running MavKa (Ctrl+A → D to detach, NOT Ctrl+C)…"
+      # -x joins an already-attached session; if that fails (no other
+      # attacher), -D -RR forces a fresh re-attach.
+      screen -x mavka 2>/dev/null || screen -D -RR mavka
     else
       echo "🍃 No running session — starting MavKa here. Type /exit to quit."
       bash "$MAVKA_HOME/start.sh"
@@ -1530,7 +1574,7 @@ case "$ACTION" in
     ;;
   start)
     bash "$MAVKA_HOME/launch.sh"
-    echo "MavKa started. `mavka logs` to follow."
+    echo 'MavKa started. Run: mavka logs'
     ;;
   stop)
     if [ -f "$HOME/Library/LaunchAgents/com.mavka.bot.plist" ]; then
@@ -1606,14 +1650,19 @@ MAVKAEOF
   # Prefer a symlink in /usr/local/bin (no PATH edits, no shell-rc edits)
   # if the dir is writable; fall back to a hint.
   if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
-    ln -sf "$MAVKA_HOME/mavka" /usr/local/bin/mavka 2>/dev/null && \
+    ln -sfn "$MAVKA_HOME/mavka" /usr/local/bin/mavka 2>/dev/null && \
       ok "linked /usr/local/bin/mavka → ~/mavka-bot/mavka"
-  elif [ -d "$HOME/.local/bin" ]; then
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$MAVKA_HOME/mavka" "$HOME/.local/bin/mavka" 2>/dev/null && \
-      ok "linked ~/.local/bin/mavka → ~/mavka-bot/mavka (make sure ~/.local/bin is in PATH)"
   else
-    info "Add this to your shell rc to run \`mavka\` from anywhere: export PATH=\"\$HOME/mavka-bot:\$PATH\""
+    # Always try ~/.local/bin — create it if it doesn't exist (common on
+    # fresh systems). This is the canonical user-local binary location
+    # on Linux + per recent macOS conventions.
+    mkdir -p "$HOME/.local/bin"
+    ln -sfn "$MAVKA_HOME/mavka" "$HOME/.local/bin/mavka" 2>/dev/null && \
+      ok "linked ~/.local/bin/mavka → ~/mavka-bot/mavka"
+    case ":$PATH:" in
+      *":$HOME/.local/bin:"*) ;;
+      *) info "Add this to your shell rc so \`mavka\` works from anywhere: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+    esac
   fi
 
   # ── search.sh ──
@@ -2531,9 +2580,9 @@ first_run() {
   info "Pi Agent needs to fetch pi-telegram on first launch. This takes ~30 seconds."
 
   if command -v tmux &>/dev/null; then
-    tmux kill-session -t mavka 2>/dev/null
+    tmux kill-session -t mavka 2>/dev/null || true
     sleep 1
-    tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh"
+    tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh" 2>/dev/null || true
   elif command -v screen &>/dev/null; then
     { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
     sleep 1
@@ -2629,6 +2678,21 @@ PYEOF
 launch_bot() {
   step "Launching ${BOT_NAME}..."
 
+  # If a LaunchAgent / systemd service is already going to start the bot
+  # via RunAtLoad, calling launch.sh here too can race — both launchers
+  # kill the screen and recreate it, /telegram-connect ends up firing
+  # into the wrong lifecycle. Wait briefly and only call launch.sh if no
+  # session is already alive from the autostart path.
+  for i in 1 2 3 4 5; do
+    if (tmux list-sessions 2>/dev/null | grep -q mavka) || \
+       (screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'); then
+      ok "${BOT_NAME} is running (autostart already brought it up)."
+      return 0
+    fi
+    sleep 1
+  done
+
+  # No session up after 5s — explicit launch.
   bash "$MAVKA_HOME/launch.sh"
   sleep 3
 
@@ -2783,24 +2847,66 @@ PYBOT
 
   # Hand the user over to the live MavKa session in this terminal. The bot
   # is already running in screen/tmux from launch_bot. Attach so the user
-  # can talk to it right here and confirm everything works. Detach with
-  # Ctrl+a then d (screen) or Ctrl+b then d (tmux) — bot keeps running.
-  echo ""
-  case "$BOT_LANG" in
-    ru) ATTACH_HINT="Ctrl+A затем D чтобы выйти из чата (бот останется работать)" ;;
-    uk) ATTACH_HINT="Ctrl+A потім D щоб вийти з чату (бот продовжить працювати)" ;;
-    de) ATTACH_HINT="Ctrl+A dann D zum Verlassen (der Bot läuft weiter)" ;;
-    fr) ATTACH_HINT="Ctrl+A puis D pour quitter (le bot continue de tourner)" ;;
-    es) ATTACH_HINT="Ctrl+A luego D para salir (el bot sigue corriendo)" ;;
-    *)  ATTACH_HINT="Ctrl+A then D to detach (bot keeps running)" ;;
-  esac
-  echo -e "  ${DIM}${ATTACH_HINT}${NC}"
-  echo ""
-  sleep 1
+  # can talk to it right here and confirm everything works.
+  #
+  # Detach key sequences differ by backend: tmux is Ctrl+B then D, screen
+  # is Ctrl+A then D — pick the message based on which one is actually
+  # running. Avoid Ctrl+C, which would SIGINT into the attached bot.
+  ATTACH_BACKEND=""
   if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
-    tmux attach -t mavka 2>/dev/null || true
+    ATTACH_BACKEND="tmux"
   elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
-    screen -r mavka 2>/dev/null || true
+    ATTACH_BACKEND="screen"
+  fi
+
+  if [ -n "$ATTACH_BACKEND" ]; then
+    if [ "$ATTACH_BACKEND" = "tmux" ]; then
+      DETACH_KEYS="Ctrl+B → D"
+    else
+      DETACH_KEYS="Ctrl+A → D"
+    fi
+    echo ""
+    case "$BOT_LANG" in
+      ru) ATTACH_HINT="${DETACH_KEYS} чтобы выйти из чата (бот останется работать). НЕ Ctrl+C." ;;
+      uk) ATTACH_HINT="${DETACH_KEYS} щоб вийти з чату (бот продовжить працювати). НЕ Ctrl+C." ;;
+      de) ATTACH_HINT="${DETACH_KEYS} zum Verlassen (der Bot läuft weiter). NICHT Ctrl+C." ;;
+      fr) ATTACH_HINT="${DETACH_KEYS} pour quitter (le bot continue de tourner). PAS Ctrl+C." ;;
+      es) ATTACH_HINT="${DETACH_KEYS} para salir (el bot sigue corriendo). NO Ctrl+C." ;;
+      *)  ATTACH_HINT="${DETACH_KEYS} to detach (bot keeps running). NOT Ctrl+C." ;;
+    esac
+    echo -e "  ${DIM}${ATTACH_HINT}${NC}"
+    echo ""
+    sleep 1
+    if [ "$ATTACH_BACKEND" = "tmux" ]; then
+      tmux attach -t mavka 2>/dev/null || true
+    else
+      # screen -x joins existing attached session; -D -RR forces re-attach
+      # if a previous terminal is hung. Either way we get into the bot.
+      screen -x mavka 2>/dev/null || screen -D -RR mavka 2>/dev/null || true
+    fi
+  else
+    echo ""
+    echo -e "  ${DIM}No tmux/screen available — chat with MavKa via Telegram only.${NC}"
+    echo -e "  ${DIM}If you install tmux later, run \`mavka\` to attach.${NC}"
+    echo ""
+  fi
+
+  # Sanity check: did the session survive? If user accidentally hit Ctrl+C
+  # the bot may now be dead and the "keeps running" line below would lie.
+  if [ -n "$ATTACH_BACKEND" ]; then
+    SESSION_ALIVE="no"
+    if [ "$ATTACH_BACKEND" = "tmux" ] && tmux has-session -t mavka 2>/dev/null; then
+      SESSION_ALIVE="yes"
+    elif [ "$ATTACH_BACKEND" = "screen" ] && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
+      SESSION_ALIVE="yes"
+    fi
+    if [ "$SESSION_ALIVE" = "no" ]; then
+      echo ""
+      echo -e "  ${YELLOW}⚠ The session is no longer running (Ctrl+C inside attach kills the bot).${NC}"
+      echo -e "  ${DIM}Restart with: ${WHITE}mavka start${NC}${DIM} or ${WHITE}bash ~/mavka-bot/launch.sh${NC}"
+      echo ""
+      return 0
+    fi
   fi
 
   # After detach: short, warm goodbye so the user knows they're back in shell.
