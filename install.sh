@@ -2643,37 +2643,66 @@ SVCEOF
 
 # ─── First Run (fetch extensions) ─────────────────────────────
 first_run() {
-  PI_TG="$HOME/.pi/agent/git/github.com/badlogic/pi-telegram/index.ts"
-  if [ -f "$PI_TG" ]; then
-    return 0
-  fi
+  # Codex P0.2 fix: don't bootstrap pi-telegram by *starting and killing*
+  # Pi (the old approach raced against npm install / jiti cache / extension
+  # init and killed Pi mid-bootstrap on a clean machine — Pi-warmed
+  # machines worked because the install was already complete).
+  #
+  # Instead, deterministically clone pi-telegram + pi-skills directly into
+  # Pi's expected git path, then npm install if a package.json is present.
+  # patch_telegram() runs on stable code afterwards and the FIRST real Pi
+  # launch is the one in launch_bot.
+  step "Pre-installing Pi extensions (pi-telegram, pi-skills)..."
 
-  step "First run — downloading extensions..."
-  info "Pi Agent needs to fetch pi-telegram on first launch. This takes ~30 seconds."
+  PI_GIT="$HOME/.pi/agent/git/github.com/badlogic"
+  mkdir -p "$PI_GIT"
 
-  if command -v tmux &>/dev/null; then
-    tmux kill-session -t mavka 2>/dev/null || true
-    sleep 1
-    tmux new-session -d -s mavka "bash $MAVKA_HOME/start.sh" 2>/dev/null || true
-  elif command -v screen &>/dev/null; then
-    { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
-    sleep 1
-    screen -dmS mavka bash "$MAVKA_HOME/start.sh" >/dev/null 2>&1 || true
-  fi
-
-  for i in $(seq 1 60); do
-    if [ -f "$PI_TG" ]; then
-      ok "pi-telegram downloaded"
-      { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
-      sleep 2
-      return 0
+  # pi-telegram — required, hard fail if it doesn't end up present
+  if [ -d "$PI_GIT/pi-telegram/.git" ]; then
+    ok "pi-telegram already cloned"
+  else
+    info "cloning pi-telegram..."
+    if git clone --depth 1 https://github.com/badlogic/pi-telegram "$PI_GIT/pi-telegram" >/dev/null 2>&1; then
+      ok "pi-telegram cloned"
+    else
+      warn "git clone of pi-telegram failed — will retry once"
+      rm -rf "$PI_GIT/pi-telegram"
+      git clone https://github.com/badlogic/pi-telegram "$PI_GIT/pi-telegram" >/dev/null 2>&1 || \
+        fail "Could not clone pi-telegram. Check network / GitHub access and re-run."
     fi
-    sleep 2
-  done
+  fi
 
-  { tmux kill-session -t mavka >/dev/null 2>&1 || true; screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
-  warn "pi-telegram download timed out. Run 'bash ~/mavka-bot/patch.sh' after first manual start."
-  return 1
+  if [ -f "$PI_GIT/pi-telegram/package.json" ] && [ ! -d "$PI_GIT/pi-telegram/node_modules" ]; then
+    info "installing pi-telegram dependencies..."
+    (cd "$PI_GIT/pi-telegram" && npm install --silent --no-audit --no-fund >/dev/null 2>&1) || \
+      warn "npm install in pi-telegram failed — extension may not load. Retry: cd $PI_GIT/pi-telegram && npm install"
+  fi
+
+  # pi-skills — optional, soft fail
+  if [ -d "$PI_GIT/pi-skills/.git" ]; then
+    ok "pi-skills already cloned"
+  else
+    info "cloning pi-skills..."
+    if git clone --depth 1 https://github.com/badlogic/pi-skills "$PI_GIT/pi-skills" >/dev/null 2>&1; then
+      ok "pi-skills cloned"
+      if [ -f "$PI_GIT/pi-skills/package.json" ] && [ ! -d "$PI_GIT/pi-skills/node_modules" ]; then
+        (cd "$PI_GIT/pi-skills" && npm install --silent --no-audit --no-fund >/dev/null 2>&1) || \
+          warn "npm install in pi-skills failed — skills may not load (non-fatal)."
+      fi
+    else
+      warn "Could not clone pi-skills (non-fatal — skills will lazy-load on first run)"
+    fi
+  fi
+
+  # Sanity: confirm the file patch_telegram needs is on disk before we leave.
+  PI_TG="$PI_GIT/pi-telegram/index.ts"
+  if [ -f "$PI_TG" ]; then
+    ok "pi-telegram source ready at $PI_TG"
+    return 0
+  else
+    warn "pi-telegram cloned but index.ts missing — upstream layout may have changed"
+    return 1
+  fi
 }
 
 # ─── Launch ───────────────────────────────────────────────────
