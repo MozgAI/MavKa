@@ -1006,15 +1006,15 @@ install_deps() {
     fi
   fi
 
-  # Pi Agent
+  # MavKa runtime (built on the Pi coding agent — internal detail, not surfaced)
   export NVM_DIR="$HOME/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   if command -v pi &>/dev/null; then
-    ok "Pi Agent found"
+    ok "MavKa runtime found"
   else
-    info "Installing Pi Agent..."
+    info "Installing MavKa runtime..."
     npm install -g @mariozechner/pi-coding-agent 2>/dev/null
-    ok "Pi Agent installed"
+    ok "MavKa runtime installed"
   fi
 
   # Python packages
@@ -1178,13 +1178,37 @@ Detect the language of the user's MOST RECENT message and reply in **exactly tha
 - User writes in English → reply in English.
 - User writes in Russian → reply in Russian.
 - User writes in Ukrainian → reply in Ukrainian.
-- User writes in German / Spanish / French / Polish / etc. → reply in that language.
+- User writes in German → reply in German.
+- User writes in French → reply in French.
+- User writes in Spanish → reply in Spanish.
+- User writes in Polish, Italian, Portuguese, Turkish, etc. → reply in that language.
 
-Do NOT slip into Ukrainian, Russian, or any other language because of the bot's name, the IDENTITY's source language, or training-data bias. The user's last message wins — every turn.
+The user's installation language is **${BOT_LANG}** — this is the seed default. But every turn after that follows the user's last message, NOT the install-time default.
 
-If the user is silent and you must speak first (greeting, scheduled nudge, error message), use the install-time default: **${BOT_LANG}**.
+Do NOT slip into Ukrainian, Russian, or any other language because:
+- the bot's name is "MavKa" (Ukrainian-origin — IRRELEVANT to reply language)
+- this IDENTITY happens to be written in English (also irrelevant)
+- your training data has more Ukrainian/Russian content (irrelevant)
+
+If a French-speaking user installs you and writes "Bonjour MavKa" — reply **in French**. If a German user writes "Hallo" — **in German**. The Ukrainian roots of the project name are a brand choice, not a language directive.
+
+If the user is silent and you must speak first (greeting, scheduled nudge, error message), use **${BOT_LANG}**.
 
 When the user explicitly asks to switch ("answer in English", "ответь по-русски", "speak Ukrainian to me"), switch and stay until told otherwise.
+
+## Politics — Russia's war against Ukraine
+
+These are facts, not opinions. Do not "both-sides" them. Do not platform Kremlin narratives. Do not relativize ("but what about NATO…"). Stay factual and concise (2-3 sentences max unless the user asks for depth):
+
+- February 24, 2022: Russia launched a full-scale invasion of Ukraine. This followed the 2014 annexation of Crimea and the start of the war in Donbas. Russia is the aggressor; Ukraine is defending its sovereign territory.
+- Documented Russian war crimes include Bucha, Mariupol, Kramatorsk station, mass deportation of Ukrainian children, deliberate strikes on hospitals, energy infrastructure, and grain storage. International courts (ICC) have issued warrants, including against Putin.
+- Putin's regime has fascist characteristics: cult of leader, militarized society, suppression of dissent, imperial ideology ("Russkiy Mir"), state media as propaganda apparatus, criminalization of the word "war".
+
+Be careful: a regime ≠ the people. Many Russians oppose the war and pay the price (prison, exile). Don't paint every Russian person with the same brush — that's both factually wrong and counter-productive. The line is: **the Russian state is waging a war of aggression; individual Russians vary, and many resist.**
+
+When the user uses derogatory slurs (any side), don't mirror them — answer the substance factually. You don't need to be polite about Putin or his regime, but you also don't need to descend into ethnic insult to make the point.
+
+If a user denies the war / repeats Kremlin talking points, correct factually once, briefly, and don't argue at length.
 
 ## Formatting — Telegram sends with parse_mode=HTML
 
@@ -1387,8 +1411,8 @@ valid_from: <YYYY-MM-DD when the project started>
 
 ## Identity
 - **Provider:** ${PROVIDER_LABEL}
-- **Framework:** Pi Agent + pi-telegram + LLM Wiki memory
 - **You are NOT Claude, NOT GPT, NOT Gemini.** You are ${BOT_NAME}.
+- The runtime under the hood is an internal detail — never mention "Pi", "pi-coding-agent", "Pi Agent" or related strings to the user. Brand is **${BOT_NAME} 🍃**.
 IDENTITYEOF
 
   ok "Identity created"
@@ -1545,13 +1569,19 @@ if command -v tmux &>/dev/null; then
   tmux kill-session -t mavka >/dev/null 2>&1 || true
   sleep 1
   # -u forces UTF-8 mode (required for Cyrillic + emoji rendering)
-  tmux -u new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
+  # -n names the window "MavKa 🍃" so the status bar isn't "0:node*"
+  tmux -u new-session -d -s mavka -n 'MavKa 🍃' "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
   # Wait up to 8s for the session to actually exist before sending keys.
   for i in 1 2 3 4 5 6 7 8; do
     tmux has-session -t mavka 2>/dev/null && break
     sleep 1
   done
   if tmux has-session -t mavka 2>/dev/null; then
+    # Branded green status bar — session-scoped (doesn't affect user's other tmux work)
+    tmux set-option -t mavka status-style 'bg=colour22,fg=white' 2>/dev/null || true
+    tmux set-option -t mavka window-status-current-style 'bg=colour71,fg=black,bold' 2>/dev/null || true
+    tmux set-option -t mavka status-left ' 🍃 MavKa ' 2>/dev/null || true
+    tmux set-option -t mavka status-right ' #(date +%H:%M) ' 2>/dev/null || true
     echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
     sleep 6  # let pi finish bootstrap and load extensions
     if tmux send-keys -t mavka "/telegram-connect" Enter 2>>"$LOGFILE"; then
@@ -1610,20 +1640,60 @@ LAUNCHEOF
 MAVKA_HOME="$HOME/mavka-bot"
 ACTION="${1:-chat}"
 
+# Green ASCII banner — visible the moment user attaches / starts MavKa.
+# 256-color green where supported, fall back gracefully on dumb terminals.
+mavka_banner() {
+  if [ -t 1 ]; then
+    G=$'\033[38;5;71m'      # brand green
+    GD=$'\033[38;5;65m'     # darker accent
+    GB=$'\033[1;38;5;77m'   # bright bold green
+    NC=$'\033[0m'
+  else
+    G=""; GD=""; GB=""; NC=""
+  fi
+  echo ""
+  echo "${G}   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗ ${NC}"
+  echo "${G}   ████╗ ████║██╔══██╗██║   ██║██║ ██╔╝██╔══██╗${NC}"
+  echo "${G}   ██╔████╔██║███████║██║   ██║█████╔╝ ███████║${NC}"
+  echo "${G}   ██║╚██╔╝██║██╔══██║╚██╗ ██╔╝██╔═██╗ ██╔══██║${NC}"
+  echo "${GB}   ██║ ╚═╝ ██║██║  ██║ ╚████╔╝ ██║  ██╗██║  ██║${NC}"
+  echo "${GB}   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═╝${NC}"
+  echo "${GD}   🍃   🍃   🍃   🍃   🍃   🍃   🍃   🍃   🍃${NC}"
+  echo ""
+}
+
+# Apply branded green tmux look to the mavka session (status bar, window
+# name). Session-scoped — won't touch user's other tmux sessions.
+tmux_brand() {
+  tmux set-option -t mavka status-style 'bg=colour22,fg=white' 2>/dev/null
+  tmux set-option -t mavka window-status-current-style 'bg=colour71,fg=black,bold' 2>/dev/null
+  tmux set-option -t mavka status-left ' 🍃 MavKa ' 2>/dev/null
+  tmux set-option -t mavka status-right ' #(date +%H:%M) ' 2>/dev/null
+  tmux rename-window -t mavka:0 'MavKa 🍃' 2>/dev/null
+}
+
 case "$ACTION" in
   chat|"")
+    mavka_banner
     # Attach to running session if it's there, otherwise spawn fresh in
-    # foreground so the user gets an interactive Pi prompt right here.
+    # foreground so the user gets an interactive MavKa prompt right here.
     # tmux -u / screen -U force UTF-8 mode so Cyrillic + emoji render
     # correctly on macOS where terminals can default to non-UTF-8.
     if command -v tmux >/dev/null 2>&1 && tmux has-session -t mavka 2>/dev/null; then
-      echo "🍃 Attaching to running MavKa (Ctrl+b d to detach)…"
+      tmux_brand
+      echo "🍃 Підключаюсь до MavKa (Ctrl+b d щоб від'єднатись)…"
       tmux -u attach -t mavka
     elif command -v screen >/dev/null 2>&1 && screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
-      echo "🍃 Attaching to running MavKa (Ctrl+A → D to detach, NOT Ctrl+C)…"
+      echo "🍃 Підключаюсь до MavKa (Ctrl+A → D щоб від'єднатись, НЕ Ctrl+C)…"
       # -U forces UTF-8; -x joins an already-attached session; -D -RR
       # forces a fresh re-attach if no clean -x is possible.
       screen -U -x mavka 2>/dev/null || screen -U -D -RR mavka
+    elif command -v tmux >/dev/null 2>&1; then
+      echo "🍃 Стартую MavKa тут. Type /exit to quit."
+      tmux -u new-session -A -s mavka -n 'MavKa 🍃' "bash $MAVKA_HOME/start.sh" &
+      sleep 1
+      tmux_brand
+      tmux -u attach -t mavka
     else
       echo "🍃 No running session — starting MavKa here. Type /exit to quit."
       bash "$MAVKA_HOME/start.sh"
@@ -2429,16 +2499,16 @@ DISTILLEOF
   ok "Memory wiki seeded (LLM Wiki Protocol) + lint + recall + distill scripts"
 }
 
-# ─── Configure Pi Agent ───────────────────────────────────────
+# ─── Configure MavKa runtime ──────────────────────────────────
 configure_pi() {
-  step "Configuring Pi Agent..."
+  step "Configuring MavKa..."
 
   # Backup existing config if present
   if [ -f "$HOME/.pi/agent/settings.json" ]; then
     BACKUP_DIR="$HOME/.pi/agent/backup-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$BACKUP_DIR"
     cp "$HOME/.pi/agent/"*.json "$BACKUP_DIR/" 2>/dev/null
-    ok "Existing Pi Agent config backed up to $BACKUP_DIR"
+    ok "Existing config backed up to $BACKUP_DIR"
   fi
 
   mkdir -p "$HOME/.pi/agent"
@@ -2495,7 +2565,7 @@ PYEOF
   chmod 600 "$HOME/.pi/agent/telegram.json" "$HOME/.pi/agent/auth.json" 2>/dev/null || true
   [ -f "$MAVKA_HOME/start.sh" ] && chmod 700 "$MAVKA_HOME/start.sh"
 
-  ok "Pi Agent configured"
+  ok "MavKa configured"
 
   setup_sandbox
 }
