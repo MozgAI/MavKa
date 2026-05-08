@@ -2359,6 +2359,25 @@ setup_sandbox() {
     fi
   fi
 
+  # Sanity-check: the upstream sandbox example imports
+  # `@earendil-works/pi-coding-agent` (the new package name), but the
+  # globally-installed Pi we use is published under
+  # `@mariozechner/pi-coding-agent`. Until upstream resolves the rename,
+  # the sandbox extension fails to load and CRASHES Pi at startup
+  # ("Cannot find module '@earendil-works/pi-coding-agent'"), which means
+  # the user's bot never comes up.
+  #
+  # Detect the mismatch and disable the extension by removing the index.ts
+  # so Pi skips it gracefully. Users who want sandbox can re-enable later
+  # once the package names align.
+  if [ -f "$SANDBOX_DIR/index.ts" ] && \
+     grep -q "@earendil-works/pi-coding-agent" "$SANDBOX_DIR/index.ts" 2>/dev/null && \
+     ! [ -d "$SANDBOX_DIR/node_modules/@earendil-works/pi-coding-agent" ]; then
+    warn "Pi sandbox extension imports a package not present in this Pi build — disabling sandbox to keep the bot working."
+    info "Remove $SANDBOX_DIR if you want a clean state. Re-enable manually when upstream pi-mono aligns scopes."
+    mv "$SANDBOX_DIR/index.ts" "$SANDBOX_DIR/index.ts.disabled" 2>/dev/null || rm -f "$SANDBOX_DIR/index.ts"
+  fi
+
   # Default deny-list config
   cat > "$HOME/.pi/agent/extensions/sandbox.json" << SANDBOXJSON
 {
