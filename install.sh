@@ -1501,11 +1501,47 @@ session_alive() {
   return 1
 }
 
+# Verify telegram bridge is actually polling — not just that we typed
+# /telegram-connect into the void. Captures the pane, checks for the
+# "polling" / "connected" success marker; if absent, re-fires
+# /telegram-connect and retries up to 5 times with backoff.
+verify_telegram_bridge() {
+  local backend="$1"  # tmux | screen
+  local snap=""
+  for attempt in 1 2 3 4 5; do
+    sleep 4
+    if [ "$backend" = "tmux" ]; then
+      tmux send-keys -t mavka "/telegram-status" Enter 2>/dev/null || true
+      sleep 3
+      snap=$(tmux capture-pane -pt mavka -S -200 2>/dev/null || echo "")
+    else
+      screen -S mavka -X hardcopy /tmp/mavka_pane.$$ 2>/dev/null || true
+      sleep 1
+      snap=$(cat /tmp/mavka_pane.$$ 2>/dev/null || echo "")
+      rm -f /tmp/mavka_pane.$$
+    fi
+    if echo "$snap" | grep -qiE 'polling|telegram (connected|active)|listening on'; then
+      echo "$(date): telegram bridge VERIFIED (attempt $attempt, $backend)" >> "$LOGFILE"
+      return 0
+    fi
+    echo "$(date): telegram bridge not yet up (attempt $attempt, $backend) — re-firing /telegram-connect" >> "$LOGFILE"
+    if [ "$backend" = "tmux" ]; then
+      tmux send-keys -t mavka "/telegram-connect" Enter 2>/dev/null || true
+    else
+      screen -S mavka -p 0 -X stuff "/telegram-connect"$'\n' 2>/dev/null || true
+    fi
+  done
+  echo "$(date): ERROR: telegram bridge NOT verified after 5 attempts. Last pane snapshot:" >> "$LOGFILE"
+  echo "$snap" | tail -30 >> "$LOGFILE"
+  return 1
+}
+
 # All output kept in $LOGFILE — nothing technical printed to user's terminal.
 if command -v tmux &>/dev/null; then
   tmux kill-session -t mavka >/dev/null 2>&1 || true
   sleep 1
-  tmux new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
+  # -u forces UTF-8 mode (required for Cyrillic + emoji rendering)
+  tmux -u new-session -d -s mavka "bash $HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
   # Wait up to 8s for the session to actually exist before sending keys.
   for i in 1 2 3 4 5 6 7 8; do
     tmux has-session -t mavka 2>/dev/null && break
@@ -1513,9 +1549,10 @@ if command -v tmux &>/dev/null; then
   done
   if tmux has-session -t mavka 2>/dev/null; then
     echo "$(date): MavKa launched in tmux session" >> "$LOGFILE"
-    sleep 5  # let pi finish bootstrap
+    sleep 6  # let pi finish bootstrap and load extensions
     if tmux send-keys -t mavka "/telegram-connect" Enter 2>>"$LOGFILE"; then
       echo "$(date): /telegram-connect sent (tmux)" >> "$LOGFILE"
+      verify_telegram_bridge tmux || true
     else
       echo "$(date): ERROR: /telegram-connect send failed (tmux)" >> "$LOGFILE"
     fi
@@ -1527,16 +1564,18 @@ elif command -v screen &>/dev/null; then
   # there's nothing to kill — redirect both streams.
   { screen -ls 2>/dev/null | awk '/^[[:space:]]*[0-9]+\.mavka[[:space:]]/{print $1}' | xargs -I{} screen -S {} -X quit >/dev/null 2>&1; screen -wipe >/dev/null 2>&1; } || true
   sleep 1
-  screen -dmS mavka bash "$HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
+  # -U forces UTF-8 mode (without it, macOS screen mangles Cyrillic + emoji)
+  screen -U -dmS mavka bash "$HOME/mavka-bot/start.sh" 2>>"$LOGFILE" || true
   for i in 1 2 3 4 5 6 7 8; do
     screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]' && break
     sleep 1
   done
   if screen -ls 2>/dev/null | grep -qE '\.mavka[[:space:]]'; then
     echo "$(date): MavKa launched in screen session" >> "$LOGFILE"
-    sleep 5  # let pi finish bootstrap
+    sleep 6  # let pi finish bootstrap and load extensions
     if screen -S mavka -p 0 -X stuff "/telegram-connect"$'\n' 2>>"$LOGFILE"; then
       echo "$(date): /telegram-connect sent (screen)" >> "$LOGFILE"
+      verify_telegram_bridge screen || true
     else
       echo "$(date): ERROR: /telegram-connect stuff failed (screen)" >> "$LOGFILE"
     fi
