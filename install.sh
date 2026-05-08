@@ -1461,6 +1461,10 @@ export GROQ_API_KEY="${GROQ_KEY}"
 export GEMINI_API_KEY="${GEMINI_KEY}"
 export TAVILY_API_KEY="${TAVILY_KEY}"
 
+# Suppress pi-coding-agent's "New version is available" banner (it's a noisy
+# distraction for end users — MavKa updates ride alongside our installer).
+export PI_SKIP_VERSION_CHECK=1
+
 cd "\$HOME/mavka-bot"
 
 PROMPT_FILE="/tmp/mavka-prompt.md"
@@ -2526,7 +2530,9 @@ TGJSON
   "packages": [
     "git:github.com/badlogic/pi-telegram",
     "git:github.com/badlogic/pi-skills"
-  ]
+  ],
+  "quietStartup": true,
+  "lastChangelogVersion": "99.99.99"
 }
 PIJSON
 
@@ -3098,6 +3104,7 @@ PYBOT
       L_step_c="Бот ответит в Telegram. НЕ в этом терминале."
       L_link_label="Прямая ссылка на бота:"
       L_world="🌍 Теперь мир у твоих ног."
+      L_terminal_chat="Или общайся с MavKa прямо в терминале — команда:"
       ;;
     uk)
       L_open_tg="ВІДКРИЙ TELEGRAM"
@@ -3106,6 +3113,7 @@ PYBOT
       L_step_c="Бот відповість у Telegram. НЕ в цьому терміналі."
       L_link_label="Пряме посилання на бота:"
       L_world="🌍 Тепер світ біля твоїх ніг."
+      L_terminal_chat="Або спілкуйся з MavKa прямо в терміналі — команда:"
       ;;
     de)
       L_open_tg="ÖFFNE TELEGRAM"
@@ -3114,6 +3122,7 @@ PYBOT
       L_step_c="Der Bot antwortet in Telegram, NICHT in diesem Terminal."
       L_link_label="Direkter Link zum Bot:"
       L_world="🌍 Jetzt liegt dir die Welt zu Füßen."
+      L_terminal_chat="Oder chatte mit MavKa direkt im Terminal — Befehl:"
       ;;
     fr)
       L_open_tg="OUVRE TELEGRAM"
@@ -3122,6 +3131,7 @@ PYBOT
       L_step_c="Le bot répondra dans Telegram, PAS dans ce terminal."
       L_link_label="Lien direct vers le bot :"
       L_world="🌍 Le monde est maintenant à tes pieds."
+      L_terminal_chat="Ou parle avec MavKa directement dans le terminal — commande :"
       ;;
     es)
       L_open_tg="ABRE TELEGRAM"
@@ -3130,6 +3140,7 @@ PYBOT
       L_step_c="El bot responderá en Telegram, NO en este terminal."
       L_link_label="Enlace directo al bot:"
       L_world="🌍 Ahora el mundo está a tus pies."
+      L_terminal_chat="O habla con MavKa directamente en la terminal — comando:"
       ;;
     *)
       L_open_tg="OPEN TELEGRAM NOW"
@@ -3138,6 +3149,7 @@ PYBOT
       L_step_c="The bot replies in Telegram. NOT in this terminal."
       L_link_label="Direct link to the bot:"
       L_world="🌍 The world is now at your feet."
+      L_terminal_chat="Or chat with MavKa right in your terminal — command:"
       ;;
   esac
 
@@ -3169,6 +3181,11 @@ PYBOT
   fi
   echo -e "  ${WHITE}2.${NC} $L_step_b"
   echo -e "  ${WHITE}3.${NC} $L_step_c"
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo ""
+  echo -e "  ${GREEN}🍃${NC} ${WHITE}$L_terminal_chat${NC}"
+  echo -e "       ${GREEN}${BOLD}mavka${NC}"
   echo ""
   echo "════════════════════════════════════════════════════════════"
   echo ""
