@@ -2651,6 +2651,7 @@ PYBOT
       L_step_b="Напиши ему: \"Привет\""
       L_step_c="Бот ответит в Telegram. НЕ в этом терминале."
       L_link_label="Прямая ссылка на бота:"
+      L_world="🌍 Теперь мир у твоих ног."
       ;;
     uk)
       L_open_tg="ВІДКРИЙ TELEGRAM"
@@ -2658,6 +2659,7 @@ PYBOT
       L_step_b="Напиши йому: \"Привіт\""
       L_step_c="Бот відповість у Telegram. НЕ в цьому терміналі."
       L_link_label="Пряме посилання на бота:"
+      L_world="🌍 Тепер світ біля твоїх ніг."
       ;;
     de)
       L_open_tg="ÖFFNE TELEGRAM"
@@ -2665,6 +2667,7 @@ PYBOT
       L_step_b="Schreibe ihm: \"Hallo\""
       L_step_c="Der Bot antwortet in Telegram, NICHT in diesem Terminal."
       L_link_label="Direkter Link zum Bot:"
+      L_world="🌍 Jetzt liegt dir die Welt zu Füßen."
       ;;
     fr)
       L_open_tg="OUVRE TELEGRAM"
@@ -2672,6 +2675,7 @@ PYBOT
       L_step_b="Écris-lui : \"Salut\""
       L_step_c="Le bot répondra dans Telegram, PAS dans ce terminal."
       L_link_label="Lien direct vers le bot :"
+      L_world="🌍 Le monde est maintenant à tes pieds."
       ;;
     es)
       L_open_tg="ABRE TELEGRAM"
@@ -2679,6 +2683,7 @@ PYBOT
       L_step_b="Escríbele: \"Hola\""
       L_step_c="El bot responderá en Telegram, NO en este terminal."
       L_link_label="Enlace directo al bot:"
+      L_world="🌍 Ahora el mundo está a tus pies."
       ;;
     *)
       L_open_tg="OPEN TELEGRAM NOW"
@@ -2686,9 +2691,14 @@ PYBOT
       L_step_b="Write to it: \"Hi\""
       L_step_c="The bot replies in Telegram. NOT in this terminal."
       L_link_label="Direct link to the bot:"
+      L_world="🌍 The world is now at your feet."
       ;;
   esac
 
+  echo ""
+  # Scenic frame around the MavKa wordmark — sun above, forest below.
+  # Olesya is drawing a custom art pass; this is the placeholder.
+  echo -e "             ${YELLOW}☀️${NC}    ${PURPLE}🌈${NC}    ${YELLOW}☀️${NC}"
   echo ""
   echo -e "${GREEN}"
   echo '   ███╗   ███╗ █████╗ ██╗   ██╗██╗  ██╗ █████╗ '
@@ -2698,7 +2708,10 @@ PYBOT
   echo '   ██║ ╚═╝ ██║██║  ██║ ╚████╔╝ ██║  ██╗██║  ██║'
   echo '   ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝╚═╝  ╚═╝'
   echo -e "${NC}"
-  echo -e "          ${GREEN}🍃 $L_is_ready${NC}"
+  echo -e "${GREEN}      🌳   🍃   🌳   🍃   🌳   🍃   🌳   🍃   🌳${NC}"
+  echo ""
+  echo -e "          ${GREEN}${BOLD}🍃 $L_is_ready${NC}"
+  echo -e "          ${GREEN}${L_world}${NC}"
   echo ""
   echo "════════════════════════════════════════════════════════════"
   echo ""
